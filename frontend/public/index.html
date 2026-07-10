@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SceneChat</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body class="public-page">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">University Open Day demonstration</p>
+      <h1>SceneChat</h1>
+    </div>
+    <div id="modeBadge" class="mode-badge">Prepared demonstration</div>
+  </header>
+
+  <main class="public-grid">
+    <section class="camera-card" aria-label="Camera and object detection">
+      <div id="visualFrame" class="visual-frame">
+        <img id="sceneImage" src="/api/frame" alt="Current SceneChat scene">
+        <div id="detectionLayer" class="detection-layer" aria-hidden="true"></div>
+        <div id="privacyHolding" class="privacy-holding" hidden>
+          <div class="privacy-symbol">◉</div>
+          <h2>Camera hidden</h2>
+          <p>The privacy holding screen is active.</p>
+        </div>
+      </div>
+      <div class="camera-footer">
+        <span><strong id="objectTotal">0</strong> objects currently highlighted</span>
+        <span id="analysisTime">No scene description yet</span>
+      </div>
+    </section>
+
+    <aside class="interpretation-card">
+      <p class="section-label">Likely scene interpretation</p>
+      <h2 id="sceneSummary">Choose a question to generate a prepared scene description.</h2>
+      <div id="uncertaintyPanel" class="uncertainty" hidden>
+        <strong>Uncertain details</strong>
+        <ul id="uncertainties"></ul>
+      </div>
+      <div class="object-counts">
+        <h3>Object labels</h3>
+        <div id="objectCounts" class="count-chips"><span class="muted">Waiting for detections</span></div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="questions" aria-labelledby="questionsTitle">
+    <div class="section-heading">
+      <div><p class="section-label">Ask about the visible scene</p><h2 id="questionsTitle">Choose a question</h2></div>
+      <button id="resetButton" class="secondary-button">Reset</button>
+    </div>
+    <div id="questionButtons" class="question-grid"></div>
+  </section>
+
+  <footer class="explanation">
+    <div><strong>What this shows</strong><p>The detector finds objects quickly. The multimodal model generates a likely interpretation of the wider scene. The two processes run separately and can be combined.</p></div>
+    <div><strong>Limitations</strong><p>The detector and the language model can both miss details or make mistakes.</p></div>
+    <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
+  </footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/assets/public.js" defer></script>
+</body>
+</html>
+
