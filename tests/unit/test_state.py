@@ -55,12 +55,33 @@ async def test_provider_failure_degrades_vllm_to_detector_only():
 
     store = StateStore(AppState(provider="vllm", internal_mode="live", mode="Combined"))
     service = AnalysisService(store, {"vllm": FailingProvider()}, {"Describe the scene."}, 1)
-    with pytest.raises(RuntimeError, match="detector-only operation"):
+    with pytest.raises(RuntimeError, match="temporarily unavailable"):
         await service.analyse(b"image", "Describe the scene.")
     state = await store.snapshot()
     assert state.internal_mode == "detector-only"
     assert state.mode == "Detector only"
     assert "raw internal detail" not in state.staff_error
+
+
+@pytest.mark.anyio
+async def test_provider_failure_uses_camera_only_wording_without_detector():
+    class FailingProvider:
+        async def analyse_scene(self, image, question):
+            raise RuntimeError("raw internal detail")
+
+    store = StateStore(
+        AppState(
+            provider="vllm",
+            internal_mode="live",
+            mode="Gemma scene description",
+        )
+    )
+    service = AnalysisService(store, {"vllm": FailingProvider()}, {"Describe the scene."}, 1)
+    with pytest.raises(RuntimeError, match="temporarily unavailable"):
+        await service.analyse(b"image", "Describe the scene.")
+    state = await store.snapshot()
+    assert state.internal_mode == "detector-only"
+    assert state.mode == "Live camera only"
 
 
 @pytest.mark.anyio
@@ -71,7 +92,7 @@ async def test_provider_timeout_does_not_leave_analysis_running():
 
     store = StateStore(AppState(provider="vllm", internal_mode="live", mode="Combined"))
     service = AnalysisService(store, {"vllm": SlowProvider()}, {"Describe the scene."}, 0.01)
-    with pytest.raises(RuntimeError, match="detector-only operation"):
+    with pytest.raises(RuntimeError, match="temporarily unavailable"):
         await service.analyse(b"image", "Describe the scene.")
     state = await store.snapshot()
     assert state.analysis_in_progress is False

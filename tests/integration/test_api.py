@@ -79,6 +79,10 @@ async def test_privacy_screen_blocks_frame_and_can_be_restored():
         assert enabled.status_code == 200
         assert enabled.json()["privacy_screen"] is True
         assert (await client.get("/api/frame")).status_code == 423
+        blocked_analysis = await client.post(
+            "/api/analyse", json={"question": "Describe the scene."}
+        )
+        assert blocked_analysis.status_code == 423
         disabled = await client.post("/api/privacy", json={"enabled": False})
         assert disabled.json()["privacy_screen"] is False
         assert (await client.get("/api/frame")).status_code == 200
@@ -90,3 +94,34 @@ async def test_detector_only_disables_analysis():
         assert (await client.post("/api/mode", json={"mode": "detector-only"})).status_code == 200
         response = await client.post("/api/analyse", json={"question": "Describe the scene."})
         assert response.status_code == 409
+
+
+@pytest.mark.anyio
+async def test_live_mode_without_detector_uses_accurate_public_wording():
+    settings = Settings(
+        scenechat_mode="live",
+        vision_provider="mock",
+        detector_backend="none",
+    )
+    app = create_app(settings)
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+    try:
+        state = (await client.get("/api/state")).json()
+        assert state["mode"] == "Gemma scene description"
+        assert state["detections"] == []
+        config = (await client.get("/api/config")).json()
+        assert config["detector_enabled"] is False
+        fallback = await client.post("/api/mode", json={"mode": "detector-only"})
+        assert fallback.json()["mode"] == "Live camera only"
+        assert fallback.json()["detections"] == []
+        replay = await client.post("/api/mode", json={"mode": "replay"})
+        assert replay.json()["detections"]
+        live = await client.post("/api/mode", json={"mode": "live"})
+        assert live.json()["detections"] == []
+    finally:
+        await client.aclose()
+        await lifespan.__aexit__(None, None, None)

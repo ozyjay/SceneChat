@@ -47,7 +47,7 @@ class AnalysisService:
                 applied = await self.state.set_analysis(analysis, generation)
                 return analysis, applied
             except Exception as exc:
-                message = "Scene analysis failed; detector-only operation remains available."
+                message = "Scene analysis is temporarily unavailable."
 
                 def degrade(state):
                     state.analysis_in_progress = False
@@ -55,7 +55,11 @@ class AnalysisService:
                     state.staff_error = message
                     if state.provider == "vllm":
                         state.internal_mode = "detector-only"
-                        state.mode = "Detector only"
+                        state.mode = (
+                            "Live camera only"
+                            if state.mode == "Gemma scene description"
+                            else "Detector only"
+                        )
 
                 await self.state.mutate(degrade)
                 raise RuntimeError(message) from exc

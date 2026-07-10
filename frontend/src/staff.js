@@ -46,7 +46,7 @@ async function initialise() {
   $('privacyOn').onclick = () => act(() => post('/api/privacy', {enabled: true}), 'Privacy screen activated.');
   $('privacyOff').onclick = () => act(() => post('/api/privacy', {enabled: false}), 'Public camera view restored.');
   $('resetSession').onclick = () => act(() => post('/api/reset'), 'Session reset and generated text cleared.');
-  $('detectorOnly').onclick = () => act(() => post('/api/mode', {mode: 'detector-only'}), 'Detector-only fallback active.');
+  $('detectorOnly').onclick = () => act(() => post('/api/mode', {mode: 'detector-only'}), 'Scene analysis disabled; camera fallback active.');
   $('applyMode').onclick = () => act(async () => {
     await post('/api/replay', {scenario: $('scenarioSelect').value});
     await post('/api/mode', {mode: $('modeSelect').value});

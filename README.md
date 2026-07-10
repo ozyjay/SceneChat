@@ -12,6 +12,8 @@ The detector finds objects quickly. The multimodal model generates a likely inte
 - `mock`: deterministic development responses
 - `replay`: synthetic image, prepared boxes, and prepared responses; no camera or model needed
 
+The current hardware-validation scope is Gemma-focused. Live camera operation can run without an object detector by setting `DETECTOR_BACKEND=none`; replay retains prepared object labels for the offline demonstration.
+
 ## Quick start
 
 Python 3.12 or newer is required. Python 3.12 is preferred for the current ROCm/vLLM tooling even though the application itself also runs on newer Python versions.
@@ -43,6 +45,12 @@ For live camera support:
 & .venv/bin/python -m pip install -e '.[camera]'
 ```
 
+With an already-tested local vLLM service running, start the Gemma-only live path with:
+
+```powershell
+pwsh -NoProfile -File scripts/run_gemma.ps1
+```
+
 For the optional YOLO adapter and benchmark:
 
 ```powershell
@@ -63,7 +71,8 @@ Do not promote this backend to Open Day use until the hardware checks in [MODEL_
 
 ## Fallback operation
 
-- Use **Detector only** in `/staff` if the model is unavailable.
+- In the Gemma-only configuration, use **Disable scene analysis** in `/staff` if the model is unavailable; the live camera remains available.
+- In a detector-enabled configuration, use **Detector only** if the model is unavailable.
 - Use **replay** plus the **replay** provider if the camera or model is unavailable.
 - Use **Hide camera now** for an immediate privacy holding screen.
 - Use **Reset session** between visitors; it clears generated text and makes in-flight responses stale.

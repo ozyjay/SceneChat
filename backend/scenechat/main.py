@@ -52,7 +52,15 @@ class ReplayRequest(BaseModel):
     scenario: str
 
 
-def _public_mode(mode: str) -> str:
+def _public_mode(mode: str, detector_backend: str = "replay") -> str:
+    if detector_backend == "none":
+        return {
+            "live": "Gemma scene description",
+            "detector-only": "Live camera only",
+            "mock": "Prepared demonstration",
+            "replay": "Prepared demonstration",
+            "development": "Prepared demonstration",
+        }[mode]
     return {
         "live": "Combined",
         "detector-only": "Detector only",
@@ -60,6 +68,14 @@ def _public_mode(mode: str) -> str:
         "replay": "Prepared demonstration",
         "development": "Prepared demonstration",
     }[mode]
+
+
+def _detections_for_mode(
+    mode: str, detector_backend: str, prepared: list[Detection]
+) -> list[Detection]:
+    if detector_backend == "none" and mode in {"live", "detector-only"}:
+        return []
+    return list(prepared)
 
 
 def _load_questions() -> list[str]:
@@ -78,12 +94,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         state = StateStore(
             AppState(
-                mode=_public_mode(configured.scenechat_mode),
+                mode=_public_mode(configured.scenechat_mode, configured.detector_backend),
                 internal_mode=configured.scenechat_mode,
                 provider=initial_provider,
                 camera_device=configured.camera_device,
                 replay_scenario=scenario.id,
-                detections=scenario.detections,
+                detections=_detections_for_mode(
+                    configured.scenechat_mode,
+                    configured.detector_backend,
+                    scenario.detections,
+                ),
                 auto_analyse=configured.auto_analyse,
                 auto_analyse_interval_seconds=configured.auto_analyse_interval_seconds,
             )
@@ -167,6 +187,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "questions": _load_questions(),
             "modes": ["development", "live", "detector-only", "mock", "replay"],
             "providers": ["mock", "replay", "vllm"],
+            "detector_enabled": configured.detector_backend != "none",
             "scenarios": [
                 {"id": item.id, "title": item.title} for item in registry.all()
             ],
@@ -216,6 +237,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/analyse")
     async def analyse(payload: AnalyseRequest, request: Request):
         state = await request.app.state.state_store.snapshot()
+        if state.privacy_screen:
+            raise HTTPException(423, "Privacy screen active")
         if state.internal_mode == "detector-only":
             raise HTTPException(409, "Scene analysis is disabled in detector-only mode")
         image = request.app.state.camera.latest_jpeg()
@@ -240,7 +263,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         detections = (
             request.app.state.camera.latest_detections()
             if state.camera_running
-            else scenario.detections
+            else _detections_for_mode(
+                state.internal_mode,
+                configured.detector_backend,
+                scenario.detections,
+            )
         )
         return await request.app.state.state_store.reset(detections)
 
@@ -268,10 +295,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def mode(payload: ModeRequest, request: Request):
         if payload.mode not in {"development", "live", "detector-only", "mock", "replay"}:
             raise HTTPException(400, "Unsupported mode")
+        current = await request.app.state.state_store.snapshot()
+        scenario = request.app.state.registry.get(current.replay_scenario)
 
         def change(state):
             state.internal_mode = payload.mode
-            state.mode = _public_mode(payload.mode)
+            state.mode = _public_mode(payload.mode, configured.detector_backend)
+            state.detections = _detections_for_mode(
+                payload.mode,
+                configured.detector_backend,
+                scenario.detections,
+            )
             state.staff_error = None
             if payload.mode == "mock":
                 state.provider = "mock"
@@ -307,7 +341,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         state = await request.app.state.state_store.snapshot()
         scenario = request.app.state.registry.get(state.replay_scenario)
         return await request.app.state.state_store.mutate(
-            lambda current: setattr(current, "detections", scenario.detections)
+            lambda current: setattr(
+                current,
+                "detections",
+                _detections_for_mode(
+                    current.internal_mode,
+                    configured.detector_backend,
+                    scenario.detections,
+                ),
+            )
         )
 
     @app.post("/api/auto-analyse", response_model=AppState)
@@ -330,7 +372,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         def change(state):
             state.replay_scenario = scenario.id
-            state.detections = scenario.detections
+            state.detections = _detections_for_mode(
+                state.internal_mode,
+                configured.detector_backend,
+                scenario.detections,
+            )
             state.scene_analysis = None
             state.generation += 1
 

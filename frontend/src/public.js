@@ -1,4 +1,4 @@
-const state = { questions: [], current: null };
+const state = { questions: [], current: null, detectorEnabled: true };
 const $ = (id) => document.getElementById(id);
 
 function showToast(message) {
@@ -35,11 +35,26 @@ function renderDetections(detections) {
 }
 
 function renderCounts(detections) {
+  if (!state.detectorEnabled) {
+    $('detectionSummary').textContent = 'Live camera · object detection off';
+    const panel = $('objectCounts');
+    panel.replaceChildren();
+    const empty = document.createElement('span');
+    empty.className = 'muted';
+    empty.textContent = 'Object detection is not enabled';
+    panel.append(empty);
+    return;
+  }
   const counts = detections.reduce((result, item) => {
     result[item.label] = (result[item.label] || 0) + 1;
     return result;
   }, {});
   $('objectTotal').textContent = detections.length;
+  $('detectionSummary').replaceChildren();
+  const total = document.createElement('strong');
+  total.id = 'objectTotal';
+  total.textContent = detections.length;
+  $('detectionSummary').append(total, ' objects currently highlighted');
   const panel = $('objectCounts');
   panel.replaceChildren();
   for (const [label, count] of Object.entries(counts)) {
@@ -91,6 +106,7 @@ async function analyse(question) {
 async function initialise() {
   const config = await request('/api/config');
   state.questions = config.questions;
+  state.detectorEnabled = config.detector_enabled;
   const buttons = $('questionButtons');
   for (const question of config.questions) {
     const button = document.createElement('button');
@@ -113,4 +129,3 @@ async function initialise() {
 }
 
 initialise().catch((error) => showToast(error.message));
-

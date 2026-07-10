@@ -8,7 +8,9 @@ Run `& .venv/bin/python -m pytest` and `pwsh -NoProfile -File scripts/smoke_test
 
 ## Optional hardware tests
 
-1. Benchmark at least two locally approved detector weights on the same 300+ frame booth video.
+The current Gemma-focused scope runs these checks with `DETECTOR_BACKEND=none`. Detector-candidate benchmarking is deferred and is required only before live object detection is re-enabled.
+
+1. Before re-enabling live detection, benchmark at least two locally approved detector weights on the same 300+ frame booth video.
 2. Run empty room, one person, several people, clutter, partial occlusion, reflections, poor light, and backlight cases.
 3. Disconnect and reconnect the camera; confirm replay remains usable and memory remains bounded.
 4. Send ten Gemma 4 image requests; record median/p95 latency and failure count.
@@ -16,7 +18,7 @@ Run `& .venv/bin/python -m pytest` and `pwsh -NoProfile -File scripts/smoke_test
 6. Trigger reset during a slow model response; confirm the stale response never appears.
 7. Repeatedly activate privacy; confirm the browser and `/api/frame` hide the image immediately.
 8. Attempt a non-curated and sensitive question through the API; confirm rejection.
-9. Run camera for 60 minutes, then combined mode for two hours while observing process/GPU/system memory.
+9. Run camera for 60 minutes, then camera plus Gemma for two hours while observing process/GPU/system memory.
 10. Cold reboot and follow only `OPEN_DAY_RUNBOOK.md` with an operator who did not build the project.
 
 ## Acceptance record

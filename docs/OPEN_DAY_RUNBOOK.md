@@ -5,12 +5,12 @@
 1. Confirm signs are visible and the camera points only into the demonstration area.
 2. Run `pwsh -NoProfile -File scripts/check_environment.ps1` and `pwsh -NoProfile -File scripts/check_ports.ps1`.
 3. Start the already-tested local model service only if Gemma 4 passed the compatibility gate.
-4. Start `pwsh -NoProfile -File scripts/run_live.ps1`, or `pwsh -NoProfile -File scripts/run_replay.ps1` for the guaranteed offline demonstration.
+4. Start `pwsh -NoProfile -File scripts/run_gemma.ps1` for the Gemma-only live path, or `pwsh -NoProfile -File scripts/run_replay.ps1` for the guaranteed offline demonstration.
 5. Open `/staff`; confirm health, mode, camera, provider and latency. Open `/` full-screen.
 
 ## Camera and live mode
 
-Select the device number in `/staff`, start the camera, and confirm the live image and detector FPS. Select **live** and the approved provider. Do not troubleshoot in front of a visitor for more than 30 seconds; switch fallback instead.
+Select the device number in `/staff`, start the camera, and confirm the live image and camera processing rate. Select **live** and the approved provider. The Gemma-only configuration must show no object boxes or detector claims. Do not troubleshoot in front of a visitor for more than 30 seconds; switch fallback instead.
 
 ## Between visitors
 
@@ -18,7 +18,7 @@ Select **Reset session**. Confirm the public description is cleared. Reset must 
 
 ## Fallbacks
 
-- **Model unavailable:** choose **Detector only**. The live boxes continue without scene descriptions.
+- **Model unavailable:** choose **Disable scene analysis**. The live camera continues without scene descriptions.
 - **Camera unavailable:** stop the camera, choose **replay** mode, **replay** provider, and the prepared scenario.
 - **Both unavailable/offline:** use replay; it needs neither service.
 - **Privacy request or unsafe framing:** select **Hide camera now** immediately. Restore only after the issue is resolved and consent/signage conditions are satisfied.

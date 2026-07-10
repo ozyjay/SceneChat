@@ -16,7 +16,7 @@
   </header>
 
   <main class="public-grid">
-    <section class="camera-card" aria-label="Camera and object detection">
+    <section class="camera-card" aria-label="Camera and scene analysis">
       <div id="visualFrame" class="visual-frame">
         <img id="sceneImage" src="/api/frame" alt="Current SceneChat scene">
         <div id="detectionLayer" class="detection-layer" aria-hidden="true"></div>
@@ -27,7 +27,7 @@
         </div>
       </div>
       <div class="camera-footer">
-        <span><strong id="objectTotal">0</strong> objects currently highlighted</span>
+        <span id="detectionSummary"><strong id="objectTotal">0</strong> objects currently highlighted</span>
         <span id="analysisTime">No scene description yet</span>
       </div>
     </section>
@@ -39,7 +39,7 @@
         <strong>Uncertain details</strong>
         <ul id="uncertainties"></ul>
       </div>
-      <div class="object-counts">
+      <div id="objectCountsPanel" class="object-counts">
         <h3>Object labels</h3>
         <div id="objectCounts" class="count-chips"><span class="muted">Waiting for detections</span></div>
       </div>
@@ -55,12 +55,11 @@
   </section>
 
   <footer class="explanation">
-    <div><strong>What this shows</strong><p>The detector finds objects quickly. The multimodal model generates a likely interpretation of the wider scene. The two processes run separately and can be combined.</p></div>
-    <div><strong>Limitations</strong><p>The detector and the language model can both miss details or make mistakes.</p></div>
+    <div><strong>What this shows</strong><p>A local multimodal model generates a likely interpretation of the live scene. Prepared object labels may also be shown in demonstration modes.</p></div>
+    <div><strong>Limitations</strong><p>The model can miss visible details or generate an incorrect description.</p></div>
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/assets/public.js" defer></script>
 </body>
 </html>
-

@@ -1,6 +1,6 @@
 # Model and hardware compatibility record
 
-Last updated: 10 July 2026. Measurements marked **not run** must be completed on the actual booth session, outside the restricted development sandbox.
+Last updated: 11 July 2026. Measurements marked **not run** must be completed on the actual booth session. Short preliminary measurements are not substitutes for the required 60-minute and two-hour acceptance runs.
 
 ## Inspected environment
 
@@ -11,12 +11,12 @@ Last updated: 10 July 2026. Measurements marked **not run** must be completed on
 | GPU | AMD Strix Halo, reported as Radeon 8050S/8060S graphics |
 | System memory | 125 GiB total, 117 GiB available during inspection |
 | ROCm packages | Fedora ROCm 7.1.x packages installed |
-| GPU access in inspection sandbox | `/dev/kfd` unavailable; `rocminfo` could not enumerate an agent |
-| Camera | no `/dev/video*` device exposed |
-| Containers | Docker 29.6.1 installed; Docker socket denied; Podman runtime directory read-only |
+| GPU access | Restricted commands cannot see `/dev/kfd`; an approved host probe and the vLLM container both enumerated `gfx1151`, 40 compute units |
+| Camera | Host devices `/dev/video0` to `/dev/video3`; devices 0 and 2 returned frames, with device 0 selected for preliminary tests |
+| Containers | Docker 29.6.1; approved host access verified the installed vLLM image and ran the local probe |
 | Relevant ports | 3900, 8900, and 8000 had no listener |
 
-The container image, vLLM version, loaded model, GPU memory use, and latency could not be inspected through the restricted sockets. They are unresolved rather than assumed.
+The restricted workspace still cannot access the hardware devices or Docker socket directly. The results below were gathered through explicit host-level probes and are recorded separately from the remaining long-duration acceptance work.
 
 ## Verified current Gemma 4 identifiers and modalities
 
@@ -60,17 +60,37 @@ $Env:VLLM_MODEL = 'google/gemma-4-E2B-it'
 
 | Result | Value |
 |---|---|
-| vLLM version/image digest | not run |
-| ROCm visible inside container | not run |
-| Model revision/hash | not run |
-| Image request accepted | not run |
-| Cold load memory | not run |
-| Peak single-request memory | not run |
-| Median/p95 latency across 10 requests | not run |
-| Detector-only FPS | not run |
-| Combined detector FPS | not run |
+| vLLM version/image digest | 0.24.0; `vllm/vllm-openai-rocm@sha256:3832d79d9e514ce2e072580689da078726454596d833c8ab803f29f3cea5ea28` |
+| ROCm visible inside container | passed preliminary probe; `gfx1151`, 40 compute units, GPU device type |
+| Model revision/hash | `google/gemma-4-E2B-it` revision `9dbdf8a839e4e9e0eb56ed80cc8886661d3817cf`; 9.54 GiB checkpoint reported by vLLM |
+| Image request accepted | passed with a generated, non-visitor PNG; structured response passed the SceneChat parser |
+| Cold load memory | vLLM reported 9.79 GiB for model loading; idle container RSS was approximately 7.44 GiB after start-up |
+| Peak single-request memory | not sampled continuously; post-request container RSS was approximately 7.85 GiB |
+| Median/p95 latency across 10 requests | 6006.2 ms median; 6057.4 ms p95; 5970.1 ms mean; 0 failures |
+| Detector-only FPS | preliminary live-camera inference only: YOLO11n 153.36 mean FPS, 7.5 ms p95; YOLO11s 135.20 mean FPS, 8.1 ms p95 |
+| Combined detector FPS | same preliminary results were collected while Gemma was loaded and idle; not yet measured during concurrent Gemma generation on the required booth video |
 | Two-hour stability | not run |
+
+## Preliminary hardware record — 10 July 2026
+
+- Camera device 0 sustained 1769 frames over 60.01 seconds at 1280×720, or 29.48 effective FPS, with no read failures. One Gemma request ran during this capture with 6039.4 ms latency. This is a short combined-load smoke test, not the required 60-minute camera run or two-hour burn-in.
+- Ten camera close/reopen cycles each opened successfully and returned a frame. A physical USB disconnect/reconnect drill is still required.
+- Detector comparison used live camera frames because no approved 300+ frame booth video was available. Both models used PyTorch 2.9.1 ROCm 7.2.1 and Ultralytics 8.4.90 on GPU device 0. Installed package metadata declares the Ultralytics licence as AGPL-3.0; suitability for public deployment still requires an explicit licence decision.
+- YOLO11n weight SHA-256: `0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1`.
+- YOLO11s weight SHA-256: `85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5`.
+- System memory after the short combined detector/model work reported about 47.4 GiB available of 125.1 GiB. This single observation is not a peak measurement and does not establish long-run stability.
+
+## Gemma-only application record — 11 July 2026
+
+- Scope was narrowed to live camera plus Gemma 4 E2B with `DETECTOR_BACKEND=none`. The earlier detector comparison remains historical preliminary data and is not gating this scope.
+- The full camera → SceneChat API → `VllmGemmaProvider` → structured parser → state path passed with a live, non-persisted camera frame. The first end-to-end request took 12,595.2 ms; later observed requests were 8,296.4–10,752.6 ms.
+- A concurrent second request returned HTTP 409 while the first completed normally, confirming the one-request limit.
+- Reset during a live request incremented the generation, cleared visitor-facing text, and caused the completed response to return `applied=false`; it did not reappear in state.
+- With privacy active, both `/api/frame` and `/api/analyse` returned HTTP 423. No test frame was written to disk.
+- Automatic analysis produced valid vLLM results and remained serialised. Disabling the schedule allowed the already-running request to finish and then settled idle.
+- Stopping vLLM during a request returned a sanitised HTTP 503, marked the provider unavailable, left the camera running, kept `/api/frame` available, and changed the public mode to **Live camera only**.
+- The live no-detector state and UI now use Gemma/camera wording and expose no prepared detection boxes. Replay mode continues to expose its prepared labels.
 
 ## Decision
 
-Gemma 4 is verified to exist and to support image input through current vLLM. Gemma 4 on this particular Strix Halo/Fedora container stack is **not yet verified**. Until every probe above passes without destabilising detection, use mock/replay for descriptions and detector-only for a live feed. Never fail over automatically to an external provider.
+Gemma 4 E2B image inference and the short live application flow are now **preliminarily verified** on this Strix Halo/Fedora container stack. Live object detection is deferred and disabled for the current scope. The Open Day gate remains **not passed** until the model/container artefacts are frozen, the physical camera drill passes, and the 60-minute camera and two-hour camera-plus-Gemma runs complete without instability. Until then, keep mock/replay and live-camera-only fallbacks ready. Never fail over automatically to an external provider.
