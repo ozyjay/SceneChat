@@ -42,20 +42,20 @@ Approximate BF16 weights alone are about 10.2 GB for E2B and 16 GB for E4B, deri
 
 Record exact values here after running:
 
-```bash
+```powershell
 # Record this exact output first.
 docker image inspect vllm/vllm-openai-rocm:latest
 
 # Illustrative launch; validate the GPU flags against the existing local setup.
-docker run --rm --device=/dev/kfd --device=/dev/dri \
-  --group-add video --ipc=host -p 8000:8000 \
-  -v "$HOME/.cache/huggingface:/root/.cache/huggingface" \
-  vllm/vllm-openai-rocm:latest \
-  --model google/gemma-4-E2B-it \
+docker run --rm --device=/dev/kfd --device=/dev/dri `
+  --group-add video --ipc=host -p 8000:8000 `
+  -v "${HOME}/.cache/huggingface:/root/.cache/huggingface" `
+  vllm/vllm-openai-rocm:latest `
+  --model google/gemma-4-E2B-it `
   --max-model-len 8192 --limit-mm-per-prompt '{"image":1}'
 
-VLLM_MODEL=google/gemma-4-E2B-it \
-  .venv/bin/python scripts/test_vllm_image.py path/to/approved-test-image.jpg
+$Env:VLLM_MODEL = 'google/gemma-4-E2B-it'
+& .venv/bin/python scripts/test_vllm_image.py path/to/approved-test-image.jpg
 ```
 
 | Result | Value |
@@ -74,4 +74,3 @@ VLLM_MODEL=google/gemma-4-E2B-it \
 ## Decision
 
 Gemma 4 is verified to exist and to support image input through current vLLM. Gemma 4 on this particular Strix Halo/Fedora container stack is **not yet verified**. Until every probe above passes without destabilising detection, use mock/replay for descriptions and detector-only for a live feed. Never fail over automatically to an external provider.
-

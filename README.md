@@ -16,13 +16,13 @@ The detector finds objects quickly. The multimodal model generates a likely inte
 
 Python 3.12 or newer is required. Python 3.12 is preferred for the current ROCm/vLLM tooling even though the application itself also runs on newer Python versions.
 
-```bash
+```powershell
 cp .env.example .env
-./scripts/setup.sh
-./scripts/run_dev.sh
+pwsh -NoProfile -File scripts/setup.ps1
+pwsh -NoProfile -File scripts/run_dev.ps1
 ```
 
-PowerShell equivalents are supplied as `setup.ps1`, `run_dev.ps1`, `run_live.ps1`, and `run_replay.ps1`.
+All operational scripts use PowerShell 7 (`pwsh`) for a consistent Fedora and VS Code workflow.
 
 Open:
 
@@ -39,14 +39,14 @@ Copy `.env.example`. Storage of frames or video is rejected by configuration. A 
 
 For live camera support:
 
-```bash
-.venv/bin/python -m pip install -e '.[camera]'
+```powershell
+& .venv/bin/python -m pip install -e '.[camera]'
 ```
 
 For the optional YOLO adapter and benchmark:
 
-```bash
-.venv/bin/python -m pip install -e '.[yolo]'
+```powershell
+& .venv/bin/python -m pip install -e '.[yolo]'
 ```
 
 Set `DETECTOR_MODEL` to a local model path. SceneChat never downloads a detector model at public-demo start-up.
@@ -55,8 +55,8 @@ Set `DETECTOR_MODEL` to a local model path. SceneChat never downloads a detector
 
 The configured candidate is exactly `google/gemma-4-E2B-it`; it has not been substituted. Start a compatible local vLLM OpenAI server on port `8000`, set `VISION_PROVIDER=vllm`, then use:
 
-```bash
-.venv/bin/python scripts/test_vllm_image.py path/to/local-test-image.jpg
+```powershell
+& .venv/bin/python scripts/test_vllm_image.py path/to/local-test-image.jpg
 ```
 
 Do not promote this backend to Open Day use until the hardware checks in [MODEL_COMPATIBILITY.md](docs/MODEL_COMPATIBILITY.md) pass. If it does not pass, use mock, replay, or detector-only mode rather than an automatic cloud service.
@@ -70,12 +70,11 @@ Do not promote this backend to Open Day use until the hardware checks in [MODEL_
 
 ## Tests
 
-```bash
-.venv/bin/python -m pytest
-./scripts/check_environment.sh
-./scripts/check_ports.sh
-./scripts/smoke_test.sh       # while the application is running
+```powershell
+& .venv/bin/python -m pytest
+pwsh -NoProfile -File scripts/check_environment.ps1
+pwsh -NoProfile -File scripts/check_ports.ps1
+pwsh -NoProfile -File scripts/smoke_test.ps1 # while the application is running
 ```
 
 No default automated test needs a physical camera, detector weights, network access, or a large model.
-

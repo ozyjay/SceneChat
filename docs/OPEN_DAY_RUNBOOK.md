@@ -3,9 +3,9 @@
 ## Cold start
 
 1. Confirm signs are visible and the camera points only into the demonstration area.
-2. Run `./scripts/check_environment.sh` and `./scripts/check_ports.sh`.
+2. Run `pwsh -NoProfile -File scripts/check_environment.ps1` and `pwsh -NoProfile -File scripts/check_ports.ps1`.
 3. Start the already-tested local model service only if Gemma 4 passed the compatibility gate.
-4. Start `./scripts/run_live.sh`, or `./scripts/run_replay.sh` for the guaranteed offline demonstration.
+4. Start `pwsh -NoProfile -File scripts/run_live.ps1`, or `pwsh -NoProfile -File scripts/run_replay.ps1` for the guaranteed offline demonstration.
 5. Open `/staff`; confirm health, mode, camera, provider and latency. Open `/` full-screen.
 
 ## Camera and live mode
@@ -31,7 +31,6 @@ For a model failure, verify the local vLLM `/v1/models` endpoint, check the mode
 
 1. Activate the privacy screen.
 2. Reset the session and confirm temporary visitor-facing text is cleared.
-3. Run `./scripts/stop.sh` or stop the service gracefully from its terminal.
+3. Run `pwsh -NoProfile -File scripts/stop.ps1` or stop the service gracefully from its terminal.
 4. Stop the vLLM container.
 5. Confirm the camera indicator is off and no visitor media exists on disk.
-

@@ -4,7 +4,7 @@
 
 The suite covers configuration safety, detector box validation, prompt safeguards, structured model parsing, replay manifest safety, provider selection, state reset, stale response rejection, mock analysis, API health/state/reset/privacy, provider failure degradation, and curated-question rejection. It must not require a camera, large model, model download, or network.
 
-Run `.venv/bin/python -m pytest` and `./scripts/smoke_test.sh` with the service active.
+Run `& .venv/bin/python -m pytest` and `pwsh -NoProfile -File scripts/smoke_test.ps1` with the service active.
 
 ## Optional hardware tests
 
