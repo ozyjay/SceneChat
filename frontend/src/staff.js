@@ -39,7 +39,11 @@ async function initialise() {
   for (const provider of config.providers) $('providerSelect').add(new Option(provider, provider));
   for (const scenario of config.scenarios) $('scenarioSelect').add(new Option(scenario.title, scenario.id));
   for (const question of config.questions) $('questionSelect').add(new Option(question, question));
-  for (const camera of config.camera_devices) $('cameraDevice').add(new Option(camera.label, camera.device));
+  const cameras = config.camera_devices || [{
+    device: initial.camera_device,
+    label: `Camera ${initial.camera_device}`,
+  }];
+  for (const camera of cameras) $('cameraDevice').add(new Option(camera.label, camera.device));
   $('modeSelect').value = initial.internal_mode; $('providerSelect').value = initial.provider; $('scenarioSelect').value = initial.replay_scenario;
   render(initial); $('healthValue').textContent = health.status;
   const events = new EventSource('/api/events'); events.onmessage = (event) => render(JSON.parse(event.data));

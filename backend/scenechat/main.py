@@ -185,15 +185,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/config")
     async def public_config(request: Request):
         registry = request.app.state.registry
-        camera_devices = discover_camera_devices()
+        state = await request.app.state.state_store.snapshot()
+        camera_devices = discover_camera_devices(selected_device=state.camera_device)
         if not any(
-            camera["device"] == configured.camera_device for camera in camera_devices
+            camera["device"] == state.camera_device for camera in camera_devices
         ):
             camera_devices.append(
                 {
-                    "device": configured.camera_device,
-                    "name": f"Camera {configured.camera_device}",
-                    "label": f"Camera {configured.camera_device}",
+                    "device": state.camera_device,
+                    "name": f"Camera {state.camera_device}",
+                    "label": f"Camera {state.camera_device}",
                 }
             )
         return {

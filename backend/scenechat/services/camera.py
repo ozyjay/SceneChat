@@ -18,6 +18,7 @@ class CameraUnavailable(RuntimeError):
 
 def discover_camera_devices(
     sysfs_root: Path = Path("/sys/class/video4linux"),
+    selected_device: int | None = None,
 ) -> list[dict[str, int | str]]:
     """Return one labelled capture index for each physical Video4Linux device."""
     cameras: dict[tuple[str, str], tuple[int, str]] = {}
@@ -39,7 +40,11 @@ def discover_camera_devices(
         except (OSError, ValueError):
             continue
         key = (name, physical_device)
-        if key not in cameras or index < cameras[key][0]:
+        if (
+            key not in cameras
+            or index == selected_device
+            or (cameras[key][0] != selected_device and index < cameras[key][0])
+        ):
             cameras[key] = (index, name)
 
     return [

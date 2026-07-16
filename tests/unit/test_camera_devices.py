@@ -45,6 +45,11 @@ def test_camera_discovery_lists_names_and_groups_physical_device_nodes(tmp_path)
             "label": "HD Pro Webcam C920 (video4)",
         },
     ]
+    assert discover_camera_devices(sysfs, selected_device=2)[0] == {
+        "device": 2,
+        "name": "Logi 4K Stream Edition",
+        "label": "Logi 4K Stream Edition (video2)",
+    }
 
 
 @pytest.mark.anyio
