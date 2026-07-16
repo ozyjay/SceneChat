@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     model_provider: str = "fallback"
     modeldeck_url: str = "http://127.0.0.1:8600"
     modeldeck_api_key: str = ""
-    modeldeck_model: str = "google/gemma-4-E2B-it"
+    modeldeck_model: str = "scenechat-vision"
     model_fallback_mode: str = "replay"
     vision_request_timeout_seconds: float = Field(default=20, gt=0, le=120)
     auto_analyse: bool = False

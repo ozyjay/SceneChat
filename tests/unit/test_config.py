@@ -43,7 +43,7 @@ def test_modeldeck_gateway_is_allowed():
     settings = Settings(
         model_provider="modeldeck", modeldeck_url="http://127.0.0.1:8600"
     )
-    assert settings.modeldeck_model == "google/gemma-4-E2B-it"
+    assert settings.modeldeck_model == "scenechat-vision"
 
 
 @pytest.mark.parametrize("port", [3600, 8000, 8600, 8610, 8699])

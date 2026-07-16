@@ -30,7 +30,7 @@ Official current instruction-tuned model identifiers include:
 
 Sources: [Hugging Face Gemma 4 release and checkpoint table](https://huggingface.co/blog/gemma4), [Google Gemma 4 12B model card](https://huggingface.co/google/gemma-4-12B), and [official vLLM Gemma 4 recipe](https://github.com/vllm-project/recipes/blob/main/Google/Gemma4.md).
 
-All listed variants accept images. The selected compatibility candidate is **exactly `google/gemma-4-E2B-it`** because it minimises the initial resource risk. No other model has been silently substituted. Production selection remains pending hardware results.
+All listed variants accept images. The selected underlying compatibility candidate is **exactly `google/gemma-4-E2B-it`** because it minimises the initial resource risk. SceneChat requests the stable ModelDeck gateway alias `scenechat-vision`, which ModelDeck currently maps to the `scenechat-gemma4-e2b-rocm` provider. Production selection remains pending hardware results.
 
 ## ModelDeck-managed worker findings
 
@@ -46,7 +46,7 @@ Use the separate ModelDeck operating procedure to prepare the approved model, th
 Invoke-RestMethod http://127.0.0.1:8600/v1/models
 $Env:MODEL_PROVIDER = 'modeldeck'
 $Env:MODELDECK_URL = 'http://127.0.0.1:8600'
-$Env:MODELDECK_MODEL = 'google/gemma-4-E2B-it'
+$Env:MODELDECK_MODEL = 'scenechat-vision'
 & .venv/bin/python scripts/test_modeldeck_image.py path/to/approved-test-image.jpg
 ```
 
