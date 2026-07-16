@@ -9,7 +9,13 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Body, FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -163,7 +169,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/staff", include_in_schema=False)
     async def staff_page():
-        return FileResponse(FRONTEND / "public" / "staff.html")
+        return RedirectResponse("/#operator-controls")
 
     @app.get("/api/health", response_model=HealthStatus)
     async def health(request: Request):

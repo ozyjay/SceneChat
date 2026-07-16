@@ -34,11 +34,14 @@ class AppClient:
 @pytest.mark.anyio
 async def test_health_public_state_and_pages():
     async with AppClient() as client:
-        assert (await client.get("/")).status_code == 200
+        public = await client.get("/")
+        assert public.status_code == 200
+        assert 'id="operator-controls"' in public.text
+        assert 'id="cameraChoices"' in public.text
+        assert 'id="cameraDevice"' not in public.text
         staff = await client.get("/staff")
-        assert staff.status_code == 200
-        assert 'id="cameraChoices"' in staff.text
-        assert 'id="cameraDevice"' not in staff.text
+        assert staff.status_code == 307
+        assert staff.headers["location"] == "/#operator-controls"
         health = await client.get("/api/health")
         assert health.status_code == 200
         assert health.json()["status"] == "ok"

@@ -1,4 +1,9 @@
-const state = { questions: [], current: null, detectorEnabled: true };
+const state = {
+  questions: [],
+  current: null,
+  detectorEnabled: true,
+  cameraLabels: new Map(),
+};
 const $ = (id) => document.getElementById(id);
 
 function showToast(message) {
@@ -15,6 +20,13 @@ async function request(path, options = {}) {
     throw new Error(payload.detail || 'The request could not be completed.');
   }
   return response.json();
+}
+
+async function post(path, body) {
+  return request(path, {
+    method: 'POST',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
 }
 
 function renderDetections(detections) {
@@ -71,6 +83,26 @@ function renderCounts(detections) {
   }
 }
 
+function renderOperator(next) {
+  $('modeValue').textContent = next.internal_mode;
+  const cameraLabel = state.cameraLabels.get(String(next.camera_device)) || `Camera ${next.camera_device}`;
+  $('cameraValue').textContent = next.camera_running ? `Running · ${cameraLabel}` : 'Stopped';
+  $('fpsValue').textContent = next.camera_running ? `${next.detector_fps.toFixed(1)} FPS` : '—';
+  $('providerValue').textContent = `${next.provider} · ${next.provider_available ? 'available' : 'unavailable'}`;
+  $('latencyValue').textContent = next.last_model_latency_ms === null ? '—' : `${next.last_model_latency_ms.toFixed(0)} ms`;
+  $('analysisValue').textContent = next.analysis_in_progress ? 'Running' : 'Idle';
+  if (document.activeElement !== $('autoEnabled')) $('autoEnabled').checked = next.auto_analyse;
+  if (document.activeElement !== $('autoInterval')) $('autoInterval').value = next.auto_analyse_interval_seconds;
+  if (next.camera_running) {
+    const activeCamera = document.querySelector(`input[name="cameraDevice"][value="${next.camera_device}"]`);
+    if (activeCamera) activeCamera.checked = true;
+  }
+  $('privacyOn').disabled = next.privacy_screen;
+  $('privacyOff').disabled = !next.privacy_screen;
+  $('staffError').hidden = !next.staff_error;
+  $('staffError').textContent = next.staff_error || '';
+}
+
 function render(next) {
   state.current = next;
   $('modeBadge').textContent = next.mode;
@@ -95,6 +127,7 @@ function render(next) {
     button.disabled = next.analysis_in_progress || next.internal_mode === 'detector-only';
     button.classList.toggle('active', button.dataset.question === next.selected_question);
   });
+  renderOperator(next);
 }
 
 async function analyse(question) {
@@ -103,8 +136,88 @@ async function analyse(question) {
   } catch (error) { showToast(error.message); }
 }
 
+async function act(action, success) {
+  try {
+    const result = await action();
+    if (result?.revision !== undefined) render(result);
+    if (success) showToast(success);
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function populateOperatorControls(config, initial) {
+  for (const mode of config.modes) $('modeSelect').add(new Option(mode, mode));
+  for (const provider of config.providers) $('providerSelect').add(new Option(provider, provider));
+  for (const scenario of config.scenarios) $('scenarioSelect').add(new Option(scenario.title, scenario.id));
+  for (const question of config.questions) $('questionSelect').add(new Option(question, question));
+
+  const cameras = config.camera_devices || [{
+    device: initial.camera_device,
+    label: `Camera ${initial.camera_device}`,
+  }];
+  for (const camera of cameras) {
+    state.cameraLabels.set(String(camera.device), camera.label);
+    const label = document.createElement('label');
+    label.className = 'camera-choice';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'cameraDevice';
+    input.value = camera.device;
+    input.checked = camera.device === initial.camera_device;
+    const name = document.createElement('span');
+    name.textContent = camera.label;
+    label.append(input, name);
+    $('cameraChoices').append(label);
+  }
+
+  $('modeSelect').value = initial.internal_mode;
+  $('providerSelect').value = initial.provider;
+  $('scenarioSelect').value = initial.replay_scenario;
+
+  $('privacyOn').onclick = () => act(() => post('/api/privacy', {enabled: true}), 'Privacy screen activated.');
+  $('privacyOff').onclick = () => act(() => post('/api/privacy', {enabled: false}), 'Public camera view restored.');
+  $('resetSession').onclick = () => act(() => post('/api/reset'), 'Session reset and generated text cleared.');
+  $('detectorOnly').onclick = () => act(() => post('/api/mode', {mode: 'detector-only'}), 'Scene analysis disabled; camera fallback active.');
+  $('applyMode').onclick = () => act(async () => {
+    await post('/api/replay', {scenario: $('scenarioSelect').value});
+    await post('/api/mode', {mode: $('modeSelect').value});
+    return post('/api/provider', {provider: $('providerSelect').value});
+  }, 'Mode and provider updated.');
+  $('startCamera').onclick = () => act(() => {
+    const selected = document.querySelector('input[name="cameraDevice"]:checked');
+    if (!selected) throw new Error('Choose a camera first.');
+    return post('/api/camera/start', {device: Number(selected.value)});
+  }, 'Camera start requested.');
+  $('stopCamera').onclick = () => act(() => post('/api/camera/stop'), 'Camera stopped.');
+  $('triggerAnalysis').onclick = () => act(() => post('/api/analyse', {question: $('questionSelect').value}), 'Scene description updated.');
+  $('clearAnalysis').onclick = () => act(() => post('/api/analysis/clear'), 'Scene description cleared.');
+  $('applyAuto').onclick = () => act(() => post('/api/auto-analyse', {
+    enabled: $('autoEnabled').checked,
+    interval_seconds: Number($('autoInterval').value),
+  }), 'Automatic schedule updated.');
+}
+
+async function updateHealth() {
+  try {
+    const [health, memory] = await Promise.all([request('/api/health'), request('/api/diagnostics')]);
+    $('healthValue').textContent = health.status;
+    $('processMemoryValue').textContent = `${memory.process_max_rss_mb.toFixed(1)} MiB`;
+    $('systemMemoryValue').textContent = memory.system_available_mb === null ? '—' : `${memory.system_available_mb.toFixed(0)} MiB`;
+  } catch {
+    $('healthValue').textContent = 'Unavailable';
+  }
+}
+
+function revealOperatorControls() {
+  if (window.location.hash !== '#operator-controls') return;
+  const controls = $('operator-controls');
+  controls.open = true;
+  controls.scrollIntoView({block: 'start'});
+}
+
 async function initialise() {
-  const config = await request('/api/config');
+  const [config, initial] = await Promise.all([request('/api/config'), request('/api/state')]);
   state.questions = config.questions;
   state.detectorEnabled = config.detector_enabled;
   const buttons = $('questionButtons');
@@ -114,7 +227,8 @@ async function initialise() {
     button.addEventListener('click', () => analyse(question));
     buttons.append(button);
   }
-  render(await request('/api/state'));
+  populateOperatorControls(config, initial);
+  render(initial);
   const events = new EventSource('/api/events');
   events.onmessage = (event) => render(JSON.parse(event.data));
   $('resetButton').addEventListener('click', async () => {
@@ -126,6 +240,13 @@ async function initialise() {
       $('sceneImage').src = `/api/frame?t=${Date.now()}`;
     }
   }, 180);
+  await updateHealth();
+  window.setInterval(updateHealth, 5000);
+  $('operatorControlsLink').addEventListener('click', () => {
+    $('operator-controls').open = true;
+  });
+  revealOperatorControls();
+  window.addEventListener('hashchange', revealOperatorControls);
 }
 
 initialise().catch((error) => showToast(error.message));

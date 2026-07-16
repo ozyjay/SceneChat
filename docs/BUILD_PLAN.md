@@ -10,7 +10,8 @@
 ## Phase 1 — recorded-image vertical slice
 
 **Goal:** provide the complete offline flow.  
-**Delivered:** validated configuration and schemas, synthetic replay asset and boxes, mock/replay providers, public and staff routes, health, curated questions, analysis, SSE state, privacy screen, and reset.  
+**Delivered:** validated configuration and schemas, synthetic replay asset and boxes, mock/replay providers, unified visitor/operator route, health, curated questions, analysis, SSE state, privacy screen, and reset.
+
 **Acceptance:** starts with one command after setup, works offline, changes responses for prepared questions, and resets cleanly.
 
 ## Phase 2 — live detector
@@ -30,7 +31,8 @@
 ## Phase 4 — Open Day interface
 
 **Goal:** make the demo readable and operable without a terminal.  
-**Delivered foundation:** large public layout, obvious mode, boxes, object counts, curated questions, limitations/privacy messages, and staff controls/diagnostics.  
+**Delivered foundation:** large public layout, obvious mode, boxes, object counts, curated questions, limitations/privacy messages, and an integrated operator controls/diagnostics panel.
+
 **User gate:** 2–3 metre readability review and an operator handover using the runbook.
 
 ## Phase 5 — hardening
@@ -43,7 +45,7 @@
 
 - **Strix Halo worker kernels:** the current official Gemma 4 AMD recipe lists Instinct GPUs, not this integrated GPU. Treat the ModelDeck-managed worker support as unverified; keep replay and detector-only ready.
 - **Unified-memory pressure:** use E2B first, restrict model context, record memory before and during combined use, and avoid concurrent analyses.
-- **Camera enumeration:** select devices in staff controls and rehearse reconnect; camera failure must route to replay.
+- **Camera enumeration:** select named devices in operator controls and rehearse reconnect; camera failure must route to replay.
 - **Detector licence/performance:** deferred while the live model path uses no detector; reassess before re-enabling live object detection.
 - **Structured-output variance:** validate every response, retain the last valid description, and show no raw exception publicly.
 - **Public privacy:** no storage, curated inputs only, immediate holding screen, reset between visitors, and visible signage.

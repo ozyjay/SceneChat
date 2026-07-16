@@ -6,11 +6,11 @@
 2. Run `pwsh -NoProfile -File scripts/check_environment.ps1` and `pwsh -NoProfile -File scripts/check_ports.ps1`.
 3. If using a live model, confirm ModelDeck management at `http://127.0.0.1:3600` and its gateway at `http://127.0.0.1:8600`. ModelDeck, not SceneChat, owns worker start-up.
 4. Start `pwsh -NoProfile -File scripts/run_modeldeck.ps1` for the live path, or `pwsh -NoProfile -File scripts/run_replay.ps1` for the guaranteed offline demonstration.
-5. Open `http://127.0.0.1:3700/staff`; confirm health, mode, camera, provider and latency. Open `http://127.0.0.1:3700/` full-screen.
+5. Open `http://127.0.0.1:3700/`, expand **Operator controls**, and confirm health, mode, camera, provider and latency. Collapse the panel and use the same page full-screen for visitors.
 
 ## Camera and live mode
 
-Select the device number in `/staff`, start the camera, and confirm the live image and camera processing rate. Select **live** and `modeldeck`. The no-detector configuration must show no object boxes or detector claims. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
+In **Operator controls**, select the named camera, start it, and confirm the live image and camera processing rate. Select **live** and `modeldeck`. The no-detector configuration must show no object boxes or detector claims. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
 
 ## Between visitors
 

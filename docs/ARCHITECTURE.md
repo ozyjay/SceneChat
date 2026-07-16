@@ -7,8 +7,7 @@ camera thread -> one latest JPEG -> detector adapter -> normalised boxes
                                                    |
                                                    +-> ModelDeck gateway :8600
 
-validated state store -> SSE updates -> public screen
-                                +-----> staff controls
+validated state store -> SSE updates -> unified visitor/operator screen
 ```
 
 ## Boundaries
@@ -18,7 +17,7 @@ validated state store -> SSE updates -> public screen
 - `vision/` isolates deterministic offline providers and the ModelDeck gateway behind one provider protocol. ModelDeck may schedule its own workers on ports `8610–8699`; SceneChat never addresses those workers directly.
 - `services/analysis.py` limits analysis to one request, applies a timeout, validates output, and rejects a result after reset by comparing state generations.
 - `services/state.py` is the shared, concurrency-safe state boundary. The browser receives state through Server-Sent Events.
-- The public and staff screens are dependency-free HTML, CSS, and JavaScript served by FastAPI. This avoids a second build tool and process for the initial deployment.
+- The unified visitor/operator screen is dependency-free HTML, CSS, and JavaScript served by FastAPI. Its operator panel shares the same state stream as the visitor view, avoiding duplicate connections and a second build tool or process.
 
 ## Failure isolation
 
@@ -26,7 +25,7 @@ Provider failure leaves the previous valid description in place, exposes a conci
 
 ## Runtime ownership
 
-SceneChat serves its public and staff interfaces, API, session state, privacy controls, reset flow, replay assets, and demo health information from `127.0.0.1:3700`. ModelDeck owns management on `127.0.0.1:3600`, its gateway on `127.0.0.1:8600`, and workers on `8610–8699`. There is no SceneChat model adapter process or extra port.
+SceneChat serves its unified visitor/operator interface, API, session state, privacy controls, reset flow, replay assets, and demo health information from `127.0.0.1:3700`. ModelDeck owns management on `127.0.0.1:3600`, its gateway on `127.0.0.1:8600`, and workers on `8610–8699`. There is no SceneChat model adapter process or extra port.
 
 ## Data handling
 

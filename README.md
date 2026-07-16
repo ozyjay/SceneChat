@@ -28,16 +28,17 @@ pwsh -NoProfile -File scripts/run_dev.ps1
 
 Open:
 
-- public screen: `http://127.0.0.1:3700/`
-- staff controls: `http://127.0.0.1:3700/staff`
+- unified visitor and operator screen: `http://127.0.0.1:3700/`
 - health: `http://127.0.0.1:3700/api/health`
 - API reference: `http://127.0.0.1:3700/api/docs`
+
+Use **Operator controls** on the main screen to configure the camera, mode and provider or view diagnostics. The former `/staff` URL redirects to this panel for compatibility.
 
 ## Port ownership
 
 | Owner | Purpose | Port |
 |---|---|---:|
-| SceneChat | Application, public/staff UX, API, health | `3700` |
+| SceneChat | Application, unified visitor/operator UX, API, health | `3700` |
 | ModelDeck | Management | `3600` |
 | ModelDeck | Model gateway used by SceneChat | `8600` |
 | ModelDeck | Managed model workers | `8610–8699` |
@@ -89,7 +90,7 @@ Do not promote a model backend to Open Day use until the hardware checks in [MOD
 
 ## Fallback operation
 
-- Use **Disable scene analysis** in `/staff` if ModelDeck is unavailable; the live camera remains available.
+- Open **Operator controls** and use **Disable scene analysis** if ModelDeck is unavailable; the live camera remains available.
 - Explicitly choose the `fallback` or `replay` provider and replay mode when a live model is not wanted.
 - Use replay if the camera or ModelDeck is unavailable; it needs neither service.
 - Use **Hide camera now** for an immediate privacy holding screen.

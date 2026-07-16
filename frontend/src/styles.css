@@ -16,8 +16,10 @@
 body { margin: 0; background: radial-gradient(circle at top, #12313c, var(--background) 45%); color: var(--ink); min-height: 100vh; }
 button, select, input { font: inherit; }
 button, .secondary-button { border-radius: .7rem; min-height: 3rem; padding: .7rem 1.1rem; font-weight: 750; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .5; }
 button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 4px solid var(--gold); outline-offset: 3px; }
-.topbar, .staff-header { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding: 1.4rem 3vw; }
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 2rem; padding: 1.4rem 3vw; }
+.topbar-actions { display: flex; align-items: center; justify-content: flex-end; gap: .8rem; flex-wrap: wrap; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; letter-spacing: -.045em; }
 .eyebrow, .section-label { text-transform: uppercase; letter-spacing: .15em; font-weight: 800; font-size: .78rem; color: var(--teal); margin-bottom: .5rem; }
@@ -57,8 +59,15 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .explanation p { margin: .4rem 0 0; line-height: 1.5; }
 .toast { position: fixed; right: 1.2rem; bottom: 1.2rem; max-width: 30rem; background: #eaf8f7; color: #09262a; padding: .9rem 1.1rem; border-radius: .6rem; box-shadow: 0 12px 40px #0008; transform: translateY(8rem); transition: transform .2s; z-index: 20; }
 .toast.show { transform: translateY(0); }
-.staff-header { border-bottom: 1px solid var(--line); }
-.staff-layout { max-width: 1500px; margin: 0 auto; padding: 1.5rem 3vw 4rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.operator-shell { margin: 0 3vw 1.5rem; scroll-margin-top: 1rem; border: 1px solid var(--line); border-radius: 1.2rem; background: #0b1d24; box-shadow: 0 18px 55px #0005; overflow: hidden; }
+.operator-shell > summary { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; padding: 1.15rem 3.5rem 1.15rem 1.4rem; color: var(--ink); font-size: 1.25rem; font-weight: 850; cursor: pointer; list-style: none; }
+.operator-shell > summary::-webkit-details-marker { display: none; }
+.operator-shell > summary::marker { color: var(--teal); }
+.operator-shell > summary::after { content: "+"; position: absolute; right: 1.4rem; color: var(--teal); font-size: 1.8rem; line-height: 1; }
+.operator-shell > summary small { color: var(--muted); font-size: .9rem; font-weight: 650; }
+.operator-shell[open] > summary { border-bottom: 1px solid var(--line); }
+.operator-shell[open] > summary::after { content: "−"; }
+.operator-layout { max-width: 1500px; margin: 0 auto; padding: 1rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .control-panel { padding: 1.3rem; }
 .control-panel h2 { font-size: 1.35rem; }
 .control-panel label { display: grid; gap: .35rem; color: var(--muted); font-weight: 650; margin: .8rem 0; }
@@ -85,4 +94,4 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .diagnostics dd { margin: .3rem 0 0; font-weight: 800; }
 .staff-error { margin-top: 1rem; padding: 1rem; border-left: 5px solid var(--danger); background: #541c2255; }
 @media (max-width: 1000px) { .public-grid { grid-template-columns: 1fr; } .question-grid { grid-template-columns: repeat(2, 1fr); } .explanation { grid-template-columns: 1fr; } }
-@media (max-width: 700px) { .topbar, .staff-header { padding: 1rem; align-items: flex-start; } .public-grid { padding: .5rem 1rem 1rem; } .questions { margin: 0 1rem 1rem; } .question-grid, .staff-layout { grid-template-columns: 1fr; } .diagnostics { grid-template-columns: 1fr 1fr; } .camera-footer { flex-direction: column; } }
+@media (max-width: 700px) { .topbar { padding: 1rem; align-items: flex-start; } .topbar-actions { align-items: stretch; flex-direction: column; } .mode-badge { font-size: .95rem; } .public-grid { padding: .5rem 1rem 1rem; } .questions, .operator-shell { margin: 0 1rem 1rem; } .question-grid, .operator-layout { grid-template-columns: 1fr; } .operator-shell > summary { grid-template-columns: 1fr; } .diagnostics { grid-template-columns: 1fr 1fr; } .camera-footer { flex-direction: column; } }
