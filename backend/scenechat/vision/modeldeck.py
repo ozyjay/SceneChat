@@ -1,4 +1,4 @@
-"""Gemma 4 adapter for a local vLLM OpenAI-compatible endpoint."""
+"""ModelDeck gateway adapter for OpenAI-compatible multimodal requests."""
 
 import base64
 import time
@@ -9,15 +9,25 @@ from scenechat.models import SceneAnalysis
 from scenechat.vision.base import VisionProviderError, build_prompt, parse_scene_analysis
 
 
-class VllmGemmaProvider:
-    name = "vllm"
+class ModelDeckProvider:
+    """Send scene analysis only through the configured ModelDeck gateway."""
 
-    def __init__(self, base_url: str, api_key: str, model: str, timeout: float):
-        self.base_url = base_url.rstrip("/")
+    name = "modeldeck"
+
+    def __init__(
+        self,
+        gateway_url: str,
+        api_key: str,
+        model: str,
+        timeout: float,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ):
+        self.gateway_url = gateway_url.rstrip("/")
         self.model = model
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.AsyncClient(
-            timeout=httpx.Timeout(timeout),
-            headers={"Authorization": f"Bearer {api_key}"},
+            timeout=httpx.Timeout(timeout), headers=headers, transport=transport
         )
 
     async def close(self) -> None:
@@ -25,7 +35,7 @@ class VllmGemmaProvider:
 
     async def health(self) -> bool:
         try:
-            response = await self._client.get(f"{self.base_url}/models")
+            response = await self._client.get(f"{self.gateway_url}/v1/models")
             return response.is_success
         except httpx.HTTPError:
             return False
@@ -56,7 +66,7 @@ class VllmGemmaProvider:
         }
         try:
             response = await self._client.post(
-                f"{self.base_url}/chat/completions", json=payload
+                f"{self.gateway_url}/v1/chat/completions", json=payload
             )
             response.raise_for_status()
             raw = response.json()["choices"][0]["message"]["content"]
@@ -64,4 +74,4 @@ class VllmGemmaProvider:
             analysis.latency_ms = round((time.perf_counter() - started) * 1000, 1)
             return analysis
         except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
-            raise VisionProviderError("The local vision model is unavailable.") from exc
+            raise VisionProviderError("The ModelDeck gateway is unavailable.") from exc

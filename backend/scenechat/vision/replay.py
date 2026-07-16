@@ -8,8 +8,9 @@ from scenechat.models import SceneAnalysis
 class ReplayVisionProvider:
     name = "replay"
 
-    def __init__(self, responses: Mapping[str, SceneAnalysis]):
+    def __init__(self, responses: Mapping[str, SceneAnalysis], name: str = "replay"):
         self._responses = dict(responses)
+        self.name = name
 
     async def health(self) -> bool:
         return bool(self._responses)
@@ -19,4 +20,3 @@ class ReplayVisionProvider:
         if response is None:
             raise RuntimeError("Replay scenario has no scene response")
         return response.model_copy(update={"provider": self.name})
-

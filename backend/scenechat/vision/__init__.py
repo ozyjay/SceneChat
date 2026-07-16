@@ -1,14 +1,13 @@
 """Multimodal scene-analysis provider adapters."""
 
 from .base import VisionLanguageProvider
+from .modeldeck import ModelDeckProvider
 from .mock import MockVisionProvider
 from .replay import ReplayVisionProvider
-from .vllm import VllmGemmaProvider
 
 __all__ = [
+    "ModelDeckProvider",
     "MockVisionProvider",
     "ReplayVisionProvider",
     "VisionLanguageProvider",
-    "VllmGemmaProvider",
 ]
-

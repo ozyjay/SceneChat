@@ -53,7 +53,7 @@ class AnalysisService:
                     state.analysis_in_progress = False
                     state.provider_available = False
                     state.staff_error = message
-                    if state.provider == "vllm":
+                    if state.provider == "modeldeck":
                         state.internal_mode = "detector-only"
                         state.mode = (
                             "Live camera only"

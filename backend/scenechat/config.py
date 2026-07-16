@@ -1,7 +1,6 @@
 """Validated application configuration."""
 
 from functools import lru_cache
-from ipaddress import ip_address
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -10,6 +9,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 ROOT = Path(__file__).resolve().parents[2]
+SCENECHAT_PORT = 3700
+MODELDECK_GATEWAY_PORT = 8600
+MODELDECK_MANAGEMENT_PORT = 3600
+MODELDECK_WORKER_PORTS = range(8610, 8700)
 
 
 class Settings(BaseSettings):
@@ -20,9 +23,8 @@ class Settings(BaseSettings):
     )
 
     scenechat_mode: str = "development"
-    backend_host: str = "127.0.0.1"
-    backend_port: int = Field(default=8900, ge=1024, le=65535)
-    public_frontend_port: int = Field(default=3900, ge=1024, le=65535)
+    scenechat_host: str = "127.0.0.1"
+    scenechat_port: int = Field(default=SCENECHAT_PORT, ge=1024, le=65535)
 
     camera_device: int = Field(default=0, ge=0)
     camera_width: int = Field(default=1280, ge=320, le=7680)
@@ -33,17 +35,17 @@ class Settings(BaseSettings):
     detector_model: str = ""
     detector_confidence: float = Field(default=0.40, ge=0, le=1)
 
-    vision_provider: str = "mock"
-    vllm_base_url: str = "http://127.0.0.1:8000/v1"
-    vllm_api_key: str = "local"
-    vllm_model: str = "google/gemma-4-E2B-it"
+    model_provider: str = "fallback"
+    modeldeck_url: str = "http://127.0.0.1:8600"
+    modeldeck_api_key: str = ""
+    modeldeck_model: str = "google/gemma-4-E2B-it"
+    model_fallback_mode: str = "replay"
     vision_request_timeout_seconds: float = Field(default=20, gt=0, le=120)
     auto_analyse: bool = False
     auto_analyse_interval_seconds: float = Field(default=5, ge=3, le=60)
 
     store_frames: bool = False
     store_video: bool = False
-    allow_external_vision_provider: bool = False
     replay_scenario: str = "demo_booth"
 
     @field_validator("scenechat_mode")
@@ -54,11 +56,18 @@ class Settings(BaseSettings):
             raise ValueError(f"must be one of {sorted(allowed)}")
         return value
 
-    @field_validator("vision_provider")
+    @field_validator("model_provider")
     @classmethod
     def validate_provider(cls, value: str) -> str:
-        if value not in {"mock", "replay", "vllm"}:
-            raise ValueError("must be mock, replay, or vllm")
+        if value not in {"modeldeck", "replay", "fallback", "mock"}:
+            raise ValueError("must be modeldeck, replay, fallback, or mock")
+        return value
+
+    @field_validator("model_fallback_mode")
+    @classmethod
+    def validate_fallback_mode(cls, value: str) -> str:
+        if value != "replay":
+            raise ValueError("must be replay")
         return value
 
     @field_validator("detector_backend")
@@ -72,21 +81,25 @@ class Settings(BaseSettings):
     def apply_safety_rules(self) -> "Settings":
         if self.store_frames or self.store_video:
             raise ValueError("visitor frame and video storage are not supported")
-        if self.backend_port in {3000, 5173, 8000, 8080}:
-            raise ValueError("backend port must use the reserved SceneChat range")
-        if self.vision_provider == "vllm":
-            parsed = urlparse(self.vllm_base_url)
-            if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-                raise ValueError("VLLM_BASE_URL must be an HTTP(S) URL")
-            try:
-                local = ip_address(parsed.hostname).is_loopback
-            except ValueError:
-                local = parsed.hostname == "localhost"
-            if not local and not self.allow_external_vision_provider:
-                raise ValueError(
-                    "external vision provider blocked; set "
-                    "ALLOW_EXTERNAL_VISION_PROVIDER=true only after approval and signage"
-                )
+        if self.scenechat_port != SCENECHAT_PORT:
+            raise ValueError(f"SCENECHAT_PORT must be {SCENECHAT_PORT}")
+
+        parsed = urlparse(self.modeldeck_url)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+            or parsed.port != MODELDECK_GATEWAY_PORT
+            or parsed.path not in {"", "/"}
+            or parsed.params
+            or parsed.query
+            or parsed.fragment
+            or parsed.username
+            or parsed.password
+        ):
+            raise ValueError(
+                "MODELDECK_URL must be the loopback ModelDeck gateway on port "
+                f"{MODELDECK_GATEWAY_PORT}"
+            )
         return self
 
 

@@ -9,8 +9,8 @@ def main() -> None:
     settings = get_settings()
     uvicorn.run(
         "scenechat.main:app",
-        host=settings.backend_host,
-        port=settings.backend_port,
+        host=settings.scenechat_host,
+        port=settings.scenechat_port,
         reload=False,
     )
 
