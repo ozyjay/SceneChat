@@ -48,18 +48,21 @@ async def test_result_started_before_reset_is_rejected():
 
 
 @pytest.mark.anyio
-async def test_provider_failure_degrades_vllm_to_detector_only():
+async def test_provider_failure_degrades_modeldeck_without_switching_provider():
     class FailingProvider:
         async def analyse_scene(self, image, question):
             raise RuntimeError("raw internal detail")
 
-    store = StateStore(AppState(provider="vllm", internal_mode="live", mode="Combined"))
-    service = AnalysisService(store, {"vllm": FailingProvider()}, {"Describe the scene."}, 1)
+    store = StateStore(AppState(provider="modeldeck", internal_mode="live", mode="Combined"))
+    service = AnalysisService(
+        store, {"modeldeck": FailingProvider()}, {"Describe the scene."}, 1
+    )
     with pytest.raises(RuntimeError, match="temporarily unavailable"):
         await service.analyse(b"image", "Describe the scene.")
     state = await store.snapshot()
     assert state.internal_mode == "detector-only"
     assert state.mode == "Detector only"
+    assert state.provider == "modeldeck"
     assert "raw internal detail" not in state.staff_error
 
 
@@ -71,12 +74,14 @@ async def test_provider_failure_uses_camera_only_wording_without_detector():
 
     store = StateStore(
         AppState(
-            provider="vllm",
+            provider="modeldeck",
             internal_mode="live",
-            mode="Gemma scene description",
+            mode="Live scene description",
         )
     )
-    service = AnalysisService(store, {"vllm": FailingProvider()}, {"Describe the scene."}, 1)
+    service = AnalysisService(
+        store, {"modeldeck": FailingProvider()}, {"Describe the scene."}, 1
+    )
     with pytest.raises(RuntimeError, match="temporarily unavailable"):
         await service.analyse(b"image", "Describe the scene.")
     state = await store.snapshot()
@@ -90,8 +95,10 @@ async def test_provider_timeout_does_not_leave_analysis_running():
         async def analyse_scene(self, image, question):
             await asyncio.sleep(1)
 
-    store = StateStore(AppState(provider="vllm", internal_mode="live", mode="Combined"))
-    service = AnalysisService(store, {"vllm": SlowProvider()}, {"Describe the scene."}, 0.01)
+    store = StateStore(AppState(provider="modeldeck", internal_mode="live", mode="Combined"))
+    service = AnalysisService(
+        store, {"modeldeck": SlowProvider()}, {"Describe the scene."}, 0.01
+    )
     with pytest.raises(RuntimeError, match="temporarily unavailable"):
         await service.analyse(b"image", "Describe the scene.")
     state = await store.snapshot()

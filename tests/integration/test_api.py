@@ -8,7 +8,7 @@ from scenechat.main import create_app
 def _settings():
     return Settings(
         scenechat_mode="replay",
-        vision_provider="replay",
+        model_provider="replay",
         detector_backend="replay",
     )
 
@@ -100,7 +100,7 @@ async def test_detector_only_disables_analysis():
 async def test_live_mode_without_detector_uses_accurate_public_wording():
     settings = Settings(
         scenechat_mode="live",
-        vision_provider="mock",
+        model_provider="mock",
         detector_backend="none",
     )
     app = create_app(settings)
@@ -111,10 +111,11 @@ async def test_live_mode_without_detector_uses_accurate_public_wording():
     )
     try:
         state = (await client.get("/api/state")).json()
-        assert state["mode"] == "Gemma scene description"
+        assert state["mode"] == "Live scene description"
         assert state["detections"] == []
         config = (await client.get("/api/config")).json()
         assert config["detector_enabled"] is False
+        assert config["providers"] == ["modeldeck", "replay", "fallback", "mock"]
         fallback = await client.post("/api/mode", json={"mode": "detector-only"})
         assert fallback.json()["mode"] == "Live camera only"
         assert fallback.json()["detections"] == []
@@ -125,3 +126,16 @@ async def test_live_mode_without_detector_uses_accurate_public_wording():
     finally:
         await client.aclose()
         await lifespan.__aexit__(None, None, None)
+
+
+@pytest.mark.anyio
+async def test_fallback_provider_is_an_explicit_offline_selection():
+    async with AppClient() as client:
+        selected = await client.post("/api/provider", json={"provider": "fallback"})
+        assert selected.status_code == 200
+        assert selected.json()["provider"] == "fallback"
+        response = await client.post(
+            "/api/analyse", json={"question": "Describe the scene."}
+        )
+        assert response.status_code == 200
+        assert response.json()["analysis"]["provider"] == "fallback"

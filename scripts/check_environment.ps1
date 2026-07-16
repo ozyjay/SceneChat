@@ -8,7 +8,7 @@ lspci | Select-String -Pattern 'VGA|3D|Display'
 Get-ChildItem /dev/video* -ErrorAction SilentlyContinue
 rocminfo | Select-Object -First 20
 Write-Host 'Relevant listening ports:'
-$RelevantPorts = 3900, 8900, 8000
+$RelevantPorts = @(3700, 3600, 8600) + @(8610..8699)
 $Listeners = @('/proc/net/tcp', '/proc/net/tcp6') |
     Where-Object { Test-Path $_ } |
     ForEach-Object { Get-Content $_ } |

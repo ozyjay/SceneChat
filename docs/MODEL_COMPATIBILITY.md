@@ -1,6 +1,6 @@
 # Model and hardware compatibility record
 
-Last updated: 11 July 2026. Measurements marked **not run** must be completed on the actual booth session. Short preliminary measurements are not substitutes for the required 60-minute and two-hour acceptance runs.
+Last updated: 16 July 2026. Measurements marked **not run** must be completed on the actual booth session. Short preliminary measurements and the superseded direct-runtime path are not substitutes for the required ModelDeck gateway and long-duration acceptance runs.
 
 ## Inspected environment
 
@@ -13,8 +13,8 @@ Last updated: 11 July 2026. Measurements marked **not run** must be completed on
 | ROCm packages | Fedora ROCm 7.1.x packages installed |
 | GPU access | Restricted commands cannot see `/dev/kfd`; an approved host probe and the vLLM container both enumerated `gfx1151`, 40 compute units |
 | Camera | Host devices `/dev/video0` to `/dev/video3`; devices 0 and 2 returned frames, with device 0 selected for preliminary tests |
-| Containers | Docker 29.6.1; approved host access verified the installed vLLM image and ran the local probe |
-| Relevant ports | 3900, 8900, and 8000 had no listener |
+| Containers | Docker 29.6.1; approved host access previously verified the model runtime image and ran a local probe |
+| Runtime ports | SceneChat `3700`; ModelDeck management `3600`; ModelDeck gateway `8600`; ModelDeck workers `8610–8699` |
 
 The restricted workspace still cannot access the hardware devices or Docker socket directly. The results below were gathered through explicit host-level probes and are recorded separately from the remaining long-duration acceptance work.
 
@@ -32,41 +32,35 @@ Sources: [Hugging Face Gemma 4 release and checkpoint table](https://huggingface
 
 All listed variants accept images. The selected compatibility candidate is **exactly `google/gemma-4-E2B-it`** because it minimises the initial resource risk. No other model has been silently substituted. Production selection remains pending hardware results.
 
-## vLLM findings
+## ModelDeck-managed worker findings
 
-vLLM 0.19.0 introduced full Gemma 4 multimodal support and requires `transformers>=5.5.0`. The official recipe documents OpenAI-compatible API use, a ROCm container `vllm/vllm-openai-rocm:latest`, and image input. Current recipes list AMD MI300X/MI325X/MI350X/MI355X as supported BF16 targets; they do **not** list Strix Halo. Therefore model fit in system memory does not establish kernel compatibility. Sources: [vLLM releases](https://github.com/vllm-project/vllm/releases) and [Gemma 4 recipe](https://github.com/vllm-project/recipes/blob/main/Google/Gemma4.md).
+The previously tested worker runtime supports Gemma 4 multimodal OpenAI-compatible requests. Current upstream AMD recipes list Instinct GPUs rather than Strix Halo, so model fit in system memory does not establish kernel compatibility. ModelDeck now owns worker selection, launch, and ports. SceneChat uses only the ModelDeck gateway and has no direct worker URL. Sources: [vLLM releases](https://github.com/vllm-project/vllm/releases) and [Gemma 4 recipe](https://github.com/vllm-project/recipes/blob/main/Google/Gemma4.md).
 
 Approximate BF16 weights alone are about 10.2 GB for E2B and 16 GB for E4B, derived from their documented total parameter counts. Runtime memory is higher because of vision/audio encoders, KV cache, activations, allocator overhead, and the detector. This estimate is not a measured requirement.
 
-## Required reproducible probe
+## Required ModelDeck gateway probe
 
-Record exact values here after running:
+Use the separate ModelDeck operating procedure to prepare the approved model, then record exact values here after running:
 
 ```powershell
-# Record this exact output first.
-docker image inspect vllm/vllm-openai-rocm:latest
-
-# Illustrative launch; validate the GPU flags against the existing local setup.
-docker run --rm --device=/dev/kfd --device=/dev/dri `
-  --group-add video --ipc=host -p 8000:8000 `
-  -v "${HOME}/.cache/huggingface:/root/.cache/huggingface" `
-  vllm/vllm-openai-rocm:latest `
-  --model google/gemma-4-E2B-it `
-  --max-model-len 8192 --limit-mm-per-prompt '{"image":1}'
-
-$Env:VLLM_MODEL = 'google/gemma-4-E2B-it'
-& .venv/bin/python scripts/test_vllm_image.py path/to/approved-test-image.jpg
+Invoke-RestMethod http://127.0.0.1:8600/v1/models
+$Env:MODEL_PROVIDER = 'modeldeck'
+$Env:MODELDECK_URL = 'http://127.0.0.1:8600'
+$Env:MODELDECK_MODEL = 'google/gemma-4-E2B-it'
+& .venv/bin/python scripts/test_modeldeck_image.py path/to/approved-test-image.jpg
 ```
 
 | Result | Value |
 |---|---|
-| vLLM version/image digest | 0.24.0; `vllm/vllm-openai-rocm@sha256:3832d79d9e514ce2e072580689da078726454596d833c8ab803f29f3cea5ea28` |
+| Historical worker version/image digest | 0.24.0; digest recorded in the 11 July acceptance notes |
+| ModelDeck version/configuration | not run |
+| Gateway model listing and image request | not run |
 | ROCm visible inside container | passed preliminary probe; `gfx1151`, 40 compute units, GPU device type |
 | Model revision/hash | `google/gemma-4-E2B-it` revision `9dbdf8a839e4e9e0eb56ed80cc8886661d3817cf`; 9.54 GiB checkpoint reported by vLLM |
-| Image request accepted | passed with a generated, non-visitor PNG; structured response passed the SceneChat parser |
-| Cold load memory | vLLM reported 9.79 GiB for model loading; idle container RSS was approximately 7.44 GiB after start-up |
-| Peak single-request memory | not sampled continuously; post-request container RSS was approximately 7.85 GiB |
-| Median/p95 latency across 10 requests | 6006.2 ms median; 6057.4 ms p95; 5970.1 ms mean; 0 failures |
+| Historical direct-runtime image request | passed with a generated, non-visitor PNG; structured response passed the SceneChat parser |
+| Historical cold load memory | worker reported 9.79 GiB for model loading; idle container RSS was approximately 7.44 GiB after start-up |
+| Historical peak single-request memory | not sampled continuously; post-request container RSS was approximately 7.85 GiB |
+| Historical median/p95 latency across 10 requests | 6006.2 ms median; 6057.4 ms p95; 5970.1 ms mean; 0 failures |
 | Detector-only FPS | preliminary live-camera inference only: YOLO11n 153.36 mean FPS, 7.5 ms p95; YOLO11s 135.20 mean FPS, 8.1 ms p95 |
 | Combined detector FPS | same preliminary results were collected while Gemma was loaded and idle; not yet measured during concurrent Gemma generation on the required booth video |
 | Two-hour stability | not run |
@@ -80,17 +74,19 @@ $Env:VLLM_MODEL = 'google/gemma-4-E2B-it'
 - YOLO11s weight SHA-256: `85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5`.
 - System memory after the short combined detector/model work reported about 47.4 GiB available of 125.1 GiB. This single observation is not a peak measurement and does not establish long-run stability.
 
-## Gemma-only application record — 11 July 2026
+## Historical direct-runtime application record — 11 July 2026
+
+This record predates the ModelDeck routing policy. It remains useful hardware evidence, but it does not validate the current SceneChat → ModelDeck gateway path and must not be used as an operating procedure.
 
 - Scope was narrowed to live camera plus Gemma 4 E2B with `DETECTOR_BACKEND=none`. The earlier detector comparison remains historical preliminary data and is not gating this scope.
-- The full camera → SceneChat API → `VllmGemmaProvider` → structured parser → state path passed with a live, non-persisted camera frame. The first end-to-end request took 12,595.2 ms; later observed requests were 8,296.4–10,752.6 ms.
+- The full camera → SceneChat API → earlier direct-runtime adapter → structured parser → state path passed with a live, non-persisted camera frame. The first end-to-end request took 12,595.2 ms; later observed requests were 8,296.4–10,752.6 ms.
 - A concurrent second request returned HTTP 409 while the first completed normally, confirming the one-request limit.
 - Reset during a live request incremented the generation, cleared visitor-facing text, and caused the completed response to return `applied=false`; it did not reappear in state.
 - With privacy active, both `/api/frame` and `/api/analyse` returned HTTP 423. No test frame was written to disk.
-- Automatic analysis produced valid vLLM results and remained serialised. Disabling the schedule allowed the already-running request to finish and then settled idle.
-- Stopping vLLM during a request returned a sanitised HTTP 503, marked the provider unavailable, left the camera running, kept `/api/frame` available, and changed the public mode to **Live camera only**.
+- Automatic analysis produced valid model results and remained serialised. Disabling the schedule allowed the already-running request to finish and then settled idle.
+- Making the earlier runtime unavailable during a request returned a sanitised HTTP 503, marked the provider unavailable, left the camera running, kept `/api/frame` available, and changed the public mode to **Live camera only**.
 - The live no-detector state and UI now use Gemma/camera wording and expose no prepared detection boxes. Replay mode continues to expose its prepared labels.
 
 ## Decision
 
-Gemma 4 E2B image inference and the short live application flow are now **preliminarily verified** on this Strix Halo/Fedora container stack. Live object detection is deferred and disabled for the current scope. The Open Day gate remains **not passed** until the model/container artefacts are frozen, the physical camera drill passes, and the 60-minute camera and two-hour camera-plus-Gemma runs complete without instability. Until then, keep mock/replay and live-camera-only fallbacks ready. Never fail over automatically to an external provider.
+Gemma 4 E2B image inference and a superseded direct-runtime application flow are **preliminarily verified** on this Strix Halo/Fedora stack. The current ModelDeck gateway path is not yet hardware-verified. The Open Day gate remains **not passed** until ModelDeck artefacts are frozen, the gateway and outage probes pass, the physical camera drill passes, and the 60-minute camera and two-hour camera-plus-model runs complete without instability. Until then, keep replay and live-camera-only fallbacks ready. Never fail over automatically to another live provider.

@@ -2,7 +2,7 @@
 
 ## Automated offline tests
 
-The suite covers configuration safety, detector box validation, prompt safeguards, structured model parsing, replay manifest safety, provider selection, state reset, stale response rejection, mock analysis, API health/state/reset/privacy, provider failure degradation, and curated-question rejection. It must not require a camera, large model, model download, or network.
+The suite covers port ownership, ModelDeck gateway URL restrictions, gateway-only request paths, explicit provider/fallback selection, configuration safety, detector box validation, prompt safeguards, structured model parsing, replay manifest safety, state reset, stale response rejection, mock analysis, API health/state/reset/privacy, provider failure degradation, and curated-question rejection. It must not require a camera, large model, model download, ModelDeck, or network.
 
 Run `& .venv/bin/python -m pytest` and `pwsh -NoProfile -File scripts/smoke_test.ps1` with the service active.
 
@@ -13,13 +13,14 @@ The current Gemma-focused scope runs these checks with `DETECTOR_BACKEND=none`. 
 1. Before re-enabling live detection, benchmark at least two locally approved detector weights on the same 300+ frame booth video.
 2. Run empty room, one person, several people, clutter, partial occlusion, reflections, poor light, and backlight cases.
 3. Disconnect and reconnect the camera; confirm replay remains usable and memory remains bounded.
-4. Send ten Gemma 4 image requests; record median/p95 latency and failure count.
-5. Stop vLLM during a request; confirm no UI freeze, retained valid description, and detector-only degradation.
+4. Send ten approved image requests through the ModelDeck gateway; record median/p95 latency and failure count and confirm every request targets port `8600`.
+5. Make the ModelDeck gateway unavailable during a request; confirm no UI freeze, retained valid description, unchanged selected provider, and camera/detector-only degradation.
 6. Trigger reset during a slow model response; confirm the stale response never appears.
 7. Repeatedly activate privacy; confirm the browser and `/api/frame` hide the image immediately.
 8. Attempt a non-curated and sensitive question through the API; confirm rejection.
-9. Run camera for 60 minutes, then camera plus Gemma for two hours while observing process/GPU/system memory.
-10. Cold reboot and follow only `OPEN_DAY_RUNBOOK.md` with an operator who did not build the project.
+9. Run camera for 60 minutes, then camera plus the ModelDeck-served model for two hours while observing process/GPU/system memory.
+10. Verify SceneChat never binds `3600`, `8600`, or `8610–8699`, and never sends a request directly to a worker.
+11. Cold reboot and follow only `OPEN_DAY_RUNBOOK.md` with an operator who did not build the project.
 
 ## Acceptance record
 

@@ -57,7 +57,7 @@ class AnalysisService:
                         state.internal_mode = "detector-only"
                         state.mode = (
                             "Live camera only"
-                            if state.mode == "Gemma scene description"
+                            if state.mode == "Live scene description"
                             else "Detector only"
                         )
 

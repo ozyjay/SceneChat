@@ -1,22 +1,24 @@
 # SceneChat
 
-SceneChat is a local-first Open Day demonstration that keeps fast object detection separate from periodic multimodal scene description. It includes large-screen public and local staff interfaces, deterministic mock and replay providers, detector-only degradation, an immediate privacy screen, and a reset that invalidates in-flight analysis.
+SceneChat is a local-first Open Day demonstration that keeps fast object detection separate from periodic multimodal scene description. It owns the visitor and kiosk experience, scene/session state, privacy controls, reset behaviour, replay operation, and demo-specific health information. Live model requests go through ModelDeck; replay and deterministic mock operation need no model service.
 
 The detector finds objects quickly. The multimodal model generates a likely interpretation of the scene. Both can make mistakes.
 
-## Supported modes
+## Supported modes and providers
 
-- `development`: prepared detections with the deterministic mock provider
-- `live`: camera plus configured detector and scene provider
-- `detector-only`: camera and boxes without a model dependency
-- `mock`: deterministic development responses
-- `replay`: synthetic image, prepared boxes, and prepared responses; no camera or model needed
+Application modes are `development`, `live`, `detector-only`, `mock`, and `replay`. Live camera operation can run without an object detector by setting `DETECTOR_BACKEND=none`; replay retains prepared object labels for the offline demonstration.
 
-The current hardware-validation scope is Gemma-focused. Live camera operation can run without an object detector by setting `DETECTOR_BACKEND=none`; replay retains prepared object labels for the offline demonstration.
+`MODEL_PROVIDER` is always explicit:
+
+- `modeldeck` sends live requests only through the ModelDeck gateway;
+- `replay` and `fallback` run without a live model (`MODEL_FALLBACK_MODE=replay`);
+- `mock` is retained for deterministic development and tests.
+
+SceneChat never switches to another live provider automatically. A ModelDeck failure keeps the selected provider visible and degrades the app to camera/detector-only operation until staff explicitly choose a recovery or fallback.
 
 ## Quick start
 
-Python 3.12 or newer is required. Python 3.12 is preferred for the current ROCm/vLLM tooling even though the application itself also runs on newer Python versions.
+Python 3.12 or newer and PowerShell 7 (`pwsh`) are required. Copy the example environment, set up the local virtual environment, and start the deterministic development mode:
 
 ```powershell
 cp .env.example .env
@@ -24,20 +26,38 @@ pwsh -NoProfile -File scripts/setup.ps1
 pwsh -NoProfile -File scripts/run_dev.ps1
 ```
 
-All operational scripts use PowerShell 7 (`pwsh`) for a consistent Fedora and VS Code workflow.
-
 Open:
 
-- public screen: `http://127.0.0.1:8900/`
-- staff controls: `http://127.0.0.1:8900/staff`
-- health: `http://127.0.0.1:8900/api/health`
-- API reference: `http://127.0.0.1:8900/api/docs`
+- public screen: `http://127.0.0.1:3700/`
+- staff controls: `http://127.0.0.1:3700/staff`
+- health: `http://127.0.0.1:3700/api/health`
+- API reference: `http://127.0.0.1:3700/api/docs`
 
-Port `3900` is reserved for a separately hosted public frontend if one is needed later. The current smaller deployment serves both interfaces from `8900`. Port `8000` belongs to the external local vLLM service.
+## Port ownership
+
+| Owner | Purpose | Port |
+|---|---|---:|
+| SceneChat | Application, public/staff UX, API, health | `3700` |
+| ModelDeck | Management | `3600` |
+| ModelDeck | Model gateway used by SceneChat | `8600` |
+| ModelDeck | Managed model workers | `8610–8699` |
+
+SceneChat binds only to `3700`. It sends model requests only to `http://127.0.0.1:8600` and never calls or binds ModelDeck management or worker ports. SceneChat does not start or stop ModelDeck workers.
 
 ## Configuration
 
-Copy `.env.example`. Storage of frames or video is rejected by configuration. A non-loopback vLLM URL is also rejected unless `ALLOW_EXTERNAL_VISION_PROVIDER=true` is deliberately set after privacy approval and signage.
+The operational environment shape is:
+
+```env
+SCENECHAT_HOST=127.0.0.1
+SCENECHAT_PORT=3700
+
+MODEL_PROVIDER=modeldeck
+MODELDECK_URL=http://127.0.0.1:8600
+MODEL_FALLBACK_MODE=replay
+```
+
+Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or worker URLs are rejected at start-up. Storage of frames or video is also rejected by configuration.
 
 For live camera support:
 
@@ -45,10 +65,10 @@ For live camera support:
 & .venv/bin/python -m pip install -e '.[camera]'
 ```
 
-With an already-tested local vLLM service running, start the Gemma-only live path with:
+With ModelDeck already running and the approved multimodal model available through its gateway, start the live no-detector path with:
 
 ```powershell
-pwsh -NoProfile -File scripts/run_gemma.ps1
+pwsh -NoProfile -File scripts/run_modeldeck.ps1
 ```
 
 For the optional YOLO adapter and benchmark:
@@ -57,23 +77,21 @@ For the optional YOLO adapter and benchmark:
 & .venv/bin/python -m pip install -e '.[yolo]'
 ```
 
-Set `DETECTOR_MODEL` to a local model path. SceneChat never downloads a detector model at public-demo start-up.
+Set `DETECTOR_MODEL` to a local model path. SceneChat never downloads detector weights at public-demo start-up.
 
-## Gemma 4 through vLLM
-
-The configured candidate is exactly `google/gemma-4-E2B-it`; it has not been substituted. Start a compatible local vLLM OpenAI server on port `8000`, set `VISION_PROVIDER=vllm`, then use:
+To probe one approved non-visitor image through ModelDeck:
 
 ```powershell
-& .venv/bin/python scripts/test_vllm_image.py path/to/local-test-image.jpg
+& .venv/bin/python scripts/test_modeldeck_image.py path/to/approved-test-image.jpg
 ```
 
-Do not promote this backend to Open Day use until the hardware checks in [MODEL_COMPATIBILITY.md](docs/MODEL_COMPATIBILITY.md) pass. If it does not pass, use mock, replay, or detector-only mode rather than an automatic cloud service.
+Do not promote a model backend to Open Day use until the hardware checks in [MODEL_COMPATIBILITY.md](docs/MODEL_COMPATIBILITY.md) pass.
 
 ## Fallback operation
 
-- In the Gemma-only configuration, use **Disable scene analysis** in `/staff` if the model is unavailable; the live camera remains available.
-- In a detector-enabled configuration, use **Detector only** if the model is unavailable.
-- Use **replay** plus the **replay** provider if the camera or model is unavailable.
+- Use **Disable scene analysis** in `/staff` if ModelDeck is unavailable; the live camera remains available.
+- Explicitly choose the `fallback` or `replay` provider and replay mode when a live model is not wanted.
+- Use replay if the camera or ModelDeck is unavailable; it needs neither service.
 - Use **Hide camera now** for an immediate privacy holding screen.
 - Use **Reset session** between visitors; it clears generated text and makes in-flight responses stale.
 
@@ -83,7 +101,7 @@ Do not promote this backend to Open Day use until the hardware checks in [MODEL_
 & .venv/bin/python -m pytest
 pwsh -NoProfile -File scripts/check_environment.ps1
 pwsh -NoProfile -File scripts/check_ports.ps1
-pwsh -NoProfile -File scripts/smoke_test.ps1 # while the application is running
+pwsh -NoProfile -File scripts/smoke_test.ps1 # while SceneChat is running
 ```
 
-No default automated test needs a physical camera, detector weights, network access, or a large model.
+No default automated test needs a physical camera, detector weights, network access, ModelDeck, or a large model.

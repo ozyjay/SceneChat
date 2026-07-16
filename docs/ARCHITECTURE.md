@@ -4,6 +4,8 @@
 camera thread -> one latest JPEG -> detector adapter -> normalised boxes
                          |
                          +-> frame sampler -> VisionLanguageProvider (one request at a time)
+                                                   |
+                                                   +-> ModelDeck gateway :8600
 
 validated state store -> SSE updates -> public screen
                                 +-----> staff controls
@@ -13,16 +15,19 @@ validated state store -> SSE updates -> public screen
 
 - `services/camera.py` owns camera resources on a background thread and retains only one encoded frame in memory. A newer frame replaces the older one.
 - `detection/` contains a no-op adapter and an optional local YOLO adapter. Replay annotations use the same normalised `Detection` schema.
-- `vision/` isolates mock, replay, and vLLM response formats behind one provider protocol.
+- `vision/` isolates deterministic offline providers and the ModelDeck gateway behind one provider protocol. ModelDeck may schedule its own workers on ports `8610–8699`; SceneChat never addresses those workers directly.
 - `services/analysis.py` limits analysis to one request, applies a timeout, validates output, and rejects a result after reset by comparing state generations.
 - `services/state.py` is the shared, concurrency-safe state boundary. The browser receives state through Server-Sent Events.
 - The public and staff screens are dependency-free HTML, CSS, and JavaScript served by FastAPI. This avoids a second build tool and process for the initial deployment.
 
 ## Failure isolation
 
-Provider failure leaves the previous valid description in place, exposes a concise staff error, and degrades a vLLM session to detector-only mode. Camera failure does not affect replay. The privacy flag hides the `/api/frame` response and public visual immediately. Reset never waits for model completion.
+Provider failure leaves the previous valid description in place, exposes a concise staff error, and degrades a ModelDeck session to detector-only mode without changing the selected provider. Camera failure does not affect replay. The privacy flag hides the `/api/frame` response and public visual immediately. Reset never waits for model completion.
+
+## Runtime ownership
+
+SceneChat serves its public and staff interfaces, API, session state, privacy controls, reset flow, replay assets, and demo health information from `127.0.0.1:3700`. ModelDeck owns management on `127.0.0.1:3600`, its gateway on `127.0.0.1:8600`, and workers on `8610–8699`. There is no SceneChat model adapter process or extra port.
 
 ## Data handling
 
 Frames exist only in camera and request memory. They are not written to disk, included in logs, or cached by browsers. The committed replay asset is synthetic. Curated questions eliminate public arbitrary-prompt input.
-

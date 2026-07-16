@@ -16,12 +16,12 @@ from pydantic import BaseModel, Field
 from scenechat import __version__
 from scenechat.config import ROOT, Settings, get_settings
 from scenechat.detection import create_detector
-from scenechat.models import AppState, HealthStatus
+from scenechat.models import AppState, Detection, HealthStatus
 from scenechat.replay import ReplayRegistry
 from scenechat.services.analysis import AnalysisBusy, AnalysisService
 from scenechat.services.camera import CameraService, CameraUnavailable
 from scenechat.services.state import StateStore
-from scenechat.vision import MockVisionProvider, ReplayVisionProvider, VllmGemmaProvider
+from scenechat.vision import ModelDeckProvider, MockVisionProvider, ReplayVisionProvider
 
 
 FRONTEND = ROOT / "frontend"
@@ -55,7 +55,7 @@ class ReplayRequest(BaseModel):
 def _public_mode(mode: str, detector_backend: str = "replay") -> str:
     if detector_backend == "none":
         return {
-            "live": "Gemma scene description",
+            "live": "Live scene description",
             "detector-only": "Live camera only",
             "mock": "Prepared demonstration",
             "replay": "Prepared demonstration",
@@ -90,7 +90,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         registry = ReplayRegistry()
         scenario = registry.get(configured.replay_scenario)
         initial_provider = (
-            "replay" if configured.scenechat_mode == "replay" else configured.vision_provider
+            "replay" if configured.scenechat_mode == "replay" else configured.model_provider
         )
         state = StateStore(
             AppState(
@@ -108,16 +108,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 auto_analyse_interval_seconds=configured.auto_analyse_interval_seconds,
             )
         )
-        vllm = VllmGemmaProvider(
-            configured.vllm_base_url,
-            configured.vllm_api_key,
-            configured.vllm_model,
+        modeldeck = ModelDeckProvider(
+            configured.modeldeck_url,
+            configured.modeldeck_api_key,
+            configured.modeldeck_model,
             configured.vision_request_timeout_seconds,
         )
         providers = {
+            "modeldeck": modeldeck,
             "mock": MockVisionProvider(),
             "replay": ReplayVisionProvider(scenario.responses),
-            "vllm": vllm,
+            "fallback": ReplayVisionProvider(scenario.responses, name="fallback"),
         }
         detector = create_detector(configured)
         camera = CameraService(configured, detector, state)
@@ -145,7 +146,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             with suppress(asyncio.CancelledError):
                 await automatic
             await camera.stop()
-            await vllm.close()
+            await modeldeck.close()
 
     app = FastAPI(
         title="SceneChat",
@@ -186,7 +187,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "questions": _load_questions(),
             "modes": ["development", "live", "detector-only", "mock", "replay"],
-            "providers": ["mock", "replay", "vllm"],
+            "providers": ["modeldeck", "replay", "fallback", "mock"],
             "detector_enabled": configured.detector_backend != "none",
             "scenarios": [
                 {"id": item.id, "title": item.title} for item in registry.all()
@@ -367,8 +368,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             scenario = request.app.state.registry.get(payload.scenario)
         except KeyError as exc:
             raise HTTPException(404, "Unknown replay scenario") from exc
-        request.app.state.providers["replay"] = ReplayVisionProvider(scenario.responses)
-        request.app.state.analysis.providers["replay"] = request.app.state.providers["replay"]
+        for provider_name in ("replay", "fallback"):
+            provider = ReplayVisionProvider(scenario.responses, name=provider_name)
+            request.app.state.providers[provider_name] = provider
+            request.app.state.analysis.providers[provider_name] = provider
 
         def change(state):
             state.replay_scenario = scenario.id

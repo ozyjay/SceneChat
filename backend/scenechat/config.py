@@ -11,8 +11,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT = Path(__file__).resolve().parents[2]
 SCENECHAT_PORT = 3700
 MODELDECK_GATEWAY_PORT = 8600
-MODELDECK_MANAGEMENT_PORT = 3600
-MODELDECK_WORKER_PORTS = range(8610, 8700)
 
 
 class Settings(BaseSettings):

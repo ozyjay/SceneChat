@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send one local image to the configured vLLM adapter and report latency."""
+"""Send one approved local image through the configured ModelDeck gateway."""
 
 import argparse
 import asyncio
@@ -8,20 +8,20 @@ import sys
 from pathlib import Path
 
 from scenechat.config import Settings
-from scenechat.vision.vllm import VllmGemmaProvider
+from scenechat.vision.modeldeck import ModelDeckProvider
 
 
 async def run(image_path: Path, question: str) -> int:
-    settings = Settings(vision_provider="vllm")
-    provider = VllmGemmaProvider(
-        settings.vllm_base_url,
-        settings.vllm_api_key,
-        settings.vllm_model,
+    settings = Settings(model_provider="modeldeck")
+    provider = ModelDeckProvider(
+        settings.modeldeck_url,
+        settings.modeldeck_api_key,
+        settings.modeldeck_model,
         settings.vision_request_timeout_seconds,
     )
     try:
         if not await provider.health():
-            print("vLLM model endpoint is unavailable.", file=sys.stderr)
+            print("ModelDeck gateway is unavailable.", file=sys.stderr)
             return 2
         result = await provider.analyse_scene(image_path.read_bytes(), question)
         print(json.dumps(result.model_dump(mode="json"), indent=2))
@@ -42,4 +42,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
