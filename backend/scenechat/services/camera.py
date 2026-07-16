@@ -121,6 +121,7 @@ class CameraService:
                 setattr(state, "camera_running", True),
                 setattr(state, "camera_device", selected),
                 setattr(state, "privacy_screen", False),
+                setattr(state, "detections", self.latest_detections()),
             )
         )
 

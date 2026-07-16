@@ -6,7 +6,7 @@ import pytest
 
 from scenechat.config import Settings
 from scenechat.detection import NoopDetector
-from scenechat.models import AppState
+from scenechat.models import AppState, Detection
 from scenechat.services.camera import CameraService, discover_camera_devices
 from scenechat.services.state import StateStore
 
@@ -76,4 +76,31 @@ async def test_start_switches_from_an_active_camera(monkeypatch):
     state = await store.snapshot()
     assert state.camera_running is True
     assert state.camera_device == 4
+    await service.stop()
+
+
+@pytest.mark.anyio
+async def test_start_clears_prepared_detections_from_live_camera(monkeypatch):
+    prepared = Detection(
+        label="prepared display",
+        confidence=0.9,
+        x=0.1,
+        y=0.1,
+        width=0.2,
+        height=0.2,
+    )
+    store = StateStore(AppState(detections=[prepared]))
+    service = CameraService(
+        Settings(_env_file=None),
+        NoopDetector(),
+        store,
+    )
+    monkeypatch.setitem(sys.modules, "cv2", SimpleNamespace())
+    monkeypatch.setattr(service, "_capture_loop", lambda device: service._ready.set())
+
+    await service.start(4)
+
+    state = await store.snapshot()
+    assert state.camera_running is True
+    assert state.detections == []
     await service.stop()
