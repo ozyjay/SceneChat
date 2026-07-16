@@ -4,8 +4,13 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local configuration and runtime output
 .env
 *.log
 dist/
 node_modules/
-.env
+/runs/
+
+# Downloaded detector checkpoints and text encoders
+/models/

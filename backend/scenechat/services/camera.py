@@ -83,6 +83,12 @@ class CameraService:
         with self._frame_lock:
             return list(self._latest_detections)
 
+    def set_detector_prompts(self, prompts: list[str]) -> None:
+        setter = getattr(self.detector, "set_prompts", None)
+        if not callable(setter):
+            raise CameraUnavailable("The selected detector does not support text prompts.")
+        setter(prompts)
+
     async def start(self, device: int | None = None) -> None:
         selected = self.settings.camera_device if device is None else device
         if self.running:

@@ -215,3 +215,68 @@ async def test_operator_can_switch_only_allowlisted_detector_models(monkeypatch)
     finally:
         await client.aclose()
         await lifespan.__aexit__(None, None, None)
+
+
+@pytest.mark.anyio
+async def test_yoloe_prompts_are_operator_approved(monkeypatch):
+    monkeypatch.setattr(main_module, "create_detector", lambda settings: NoopDetector())
+    settings = Settings(
+        _env_file=None,
+        scenechat_mode="live",
+        model_provider="mock",
+        detector_backend="yoloe",
+        detector_model="/models/yoloe-26s-seg.pt",
+        detector_text_encoder="/models/mobileclip2_b.ts",
+        detector_prompts=["person", "computer mouse"],
+        detector_prompt_allowlist=["person", "computer mouse", "camera"],
+    )
+    app = create_app(settings)
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+    applied = []
+    monkeypatch.setattr(
+        app.state.camera,
+        "set_detector_prompts",
+        lambda prompts: applied.append(prompts),
+    )
+    try:
+        config = (await client.get("/api/config")).json()
+        assert config["detector_prompting"] is True
+        assert config["detector_prompt_allowlist"] == [
+            "person",
+            "computer mouse",
+            "camera",
+        ]
+
+        accepted = await client.post(
+            "/api/detector/prompts",
+            json={"prompts": ["person", "camera"], "auto_update": True},
+        )
+        assert accepted.status_code == 200
+        assert accepted.json()["detector_prompts"] == ["person", "camera"]
+        assert accepted.json()["detector_prompt_auto_update"] is True
+        assert applied == [["person", "camera"]]
+
+        rejected = await client.post(
+            "/api/detector/prompts",
+            json={"prompts": ["red-haired person"], "auto_update": True},
+        )
+        assert rejected.status_code == 400
+    finally:
+        await client.aclose()
+        await lifespan.__aexit__(None, None, None)
+
+
+def test_gemma_labels_only_add_exact_approved_detector_prompts():
+    settings = Settings(
+        _env_file=None,
+        detector_prompts=["person", "computer mouse"],
+        detector_prompt_allowlist=["person", "computer mouse", "camera"],
+    )
+
+    assert main_module._approved_detector_prompts(
+        settings, ["Camera", "red-haired person", "a black computer mouse"]
+    ) == ["person", "computer mouse", "camera"]

@@ -92,6 +92,15 @@ function renderOperator(next) {
   if (next.detector_model && document.activeElement !== $('detectorModelSelect')) {
     $('detectorModelSelect').value = next.detector_model;
   }
+  if (document.activeElement !== $('detectorPromptSelect')) {
+    const activePrompts = new Set(next.detector_prompts || []);
+    for (const option of $('detectorPromptSelect').options) {
+      option.selected = activePrompts.has(option.value);
+    }
+  }
+  if (document.activeElement !== $('detectorPromptAutoUpdate')) {
+    $('detectorPromptAutoUpdate').checked = next.detector_prompt_auto_update;
+  }
   $('providerValue').textContent = `${next.provider} · ${next.provider_available ? 'available' : 'unavailable'}`;
   $('latencyValue').textContent = next.last_model_latency_ms === null ? '—' : `${next.last_model_latency_ms.toFixed(0)} ms`;
   $('analysisValue').textContent = next.analysis_in_progress ? 'Running' : 'Idle';
@@ -162,6 +171,14 @@ function populateOperatorControls(config, initial) {
   }
   $('detectorModelSelect').value = initial.detector_model || '';
   $('applyDetectorModel').disabled = detectorModels.length < 2;
+  const detectorPrompts = config.detector_prompt_allowlist || [];
+  $('detectorPromptControls').hidden = !config.detector_prompting;
+  for (const prompt of detectorPrompts) {
+    const option = new Option(prompt, prompt);
+    option.selected = (initial.detector_prompts || []).includes(prompt);
+    $('detectorPromptSelect').add(option);
+  }
+  $('detectorPromptAutoUpdate').checked = initial.detector_prompt_auto_update;
 
   const cameras = config.camera_devices || [{
     device: initial.camera_device,
@@ -205,6 +222,14 @@ function populateOperatorControls(config, initial) {
     () => post('/api/detector/model', {model: $('detectorModelSelect').value}),
     'Object detector model switched.',
   );
+  $('applyDetectorPrompts').onclick = () => act(() => {
+    const prompts = Array.from($('detectorPromptSelect').selectedOptions, option => option.value);
+    if (!prompts.length) throw new Error('Choose at least one object prompt.');
+    return post('/api/detector/prompts', {
+      prompts,
+      auto_update: $('detectorPromptAutoUpdate').checked,
+    });
+  }, 'YOLOE object prompts updated.');
   $('triggerAnalysis').onclick = () => act(() => post('/api/analyse', {question: $('questionSelect').value}), 'Scene description updated.');
   $('clearAnalysis').onclick = () => act(() => post('/api/analysis/clear'), 'Scene description cleared.');
   $('applyAuto').onclick = () => act(() => post('/api/auto-analyse', {

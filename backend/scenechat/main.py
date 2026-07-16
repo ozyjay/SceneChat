@@ -55,6 +55,11 @@ class DetectorModelRequest(BaseModel):
     model: str = Field(min_length=1, max_length=64)
 
 
+class DetectorPromptRequest(BaseModel):
+    prompts: list[str] = Field(min_length=1, max_length=20)
+    auto_update: bool
+
+
 class AutoAnalyseRequest(BaseModel):
     enabled: bool
     interval_seconds: float = Field(default=5, ge=3, le=60)
@@ -94,6 +99,49 @@ def _load_questions() -> list[str]:
     return json.loads((ROOT / "prompts" / "curated_questions.json").read_text("utf-8"))
 
 
+def _approved_detector_prompts(configured: Settings, labels: list[str]) -> list[str]:
+    approved = {item.casefold(): item for item in configured.detector_prompt_allowlist}
+    selected = list(configured.detector_prompts)
+    for label in labels:
+        normalised = " ".join(label.strip().lower().split())
+        canonical = approved.get(normalised.casefold())
+        if canonical and canonical not in selected:
+            selected.append(canonical)
+        if len(selected) == 20:
+            break
+    return selected
+
+
+async def _apply_detector_prompts(app: FastAPI, prompts: list[str]) -> AppState:
+    try:
+        await run_in_threadpool(app.state.camera.set_detector_prompts, prompts)
+    except (CameraUnavailable, RuntimeError, ValueError) as exc:
+        await app.state.state_store.mutate(
+            lambda state: setattr(state, "staff_error", "Detector prompts could not be updated.")
+        )
+        raise HTTPException(503, "Detector prompts could not be updated") from exc
+    return await app.state.state_store.mutate(
+        lambda state: (
+            setattr(state, "detector_prompts", prompts),
+            setattr(state, "staff_error", None),
+        )
+    )
+
+
+async def _refresh_detector_prompts_from_analysis(
+    app: FastAPI, configured: Settings, labels: list[str]
+) -> None:
+    state = await app.state.state_store.snapshot()
+    if configured.detector_backend != "yoloe" or not state.detector_prompt_auto_update:
+        return
+    prompts = _approved_detector_prompts(configured, labels)
+    try:
+        await _apply_detector_prompts(app, prompts)
+    except HTTPException:
+        # Scene analysis remains usable if the optional detector refresh fails.
+        return
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     configured = settings or get_settings()
 
@@ -112,6 +160,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 camera_device=configured.camera_device,
                 detector_backend=configured.detector_backend,
                 detector_model=configured.detector_model_id(),
+                detector_prompts=(
+                    configured.detector_prompts
+                    if configured.detector_backend == "yoloe"
+                    else []
+                ),
+                detector_prompt_auto_update=(
+                    configured.detector_prompt_auto_update
+                    if configured.detector_backend == "yoloe"
+                    else False
+                ),
                 replay_scenario=scenario.id,
                 detections=_detections_for_mode(
                     configured.scenechat_mode,
@@ -220,7 +278,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     {"id": model_id, "label": model_id}
                     for model_id in configured.available_detector_models()
                 ]
-                if configured.detector_backend in {"auto", "yolo"}
+                if configured.detector_backend in {"auto", "yolo", "yoloe"}
+                else []
+            ),
+            "detector_prompting": configured.detector_backend == "yoloe",
+            "detector_prompt_allowlist": (
+                configured.detector_prompt_allowlist
+                if configured.detector_backend == "yoloe"
                 else []
             ),
             "camera_devices": camera_devices,
@@ -287,6 +351,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             analysis_result, applied = await request.app.state.analysis.analyse(
                 image, payload.question
             )
+            if applied:
+                await _refresh_detector_prompts_from_analysis(
+                    request.app,
+                    configured,
+                    [item.label for item in analysis_result.objects],
+                )
             return {"analysis": analysis_result, "applied": applied}
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
@@ -394,7 +464,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/detector/model", response_model=AppState)
     async def select_detector_model(payload: DetectorModelRequest, request: Request):
         models = configured.available_detector_models()
-        if configured.detector_backend not in {"auto", "yolo"} or not models:
+        if configured.detector_backend not in {"auto", "yolo", "yoloe"} or not models:
             raise HTTPException(409, "Live detector model switching is not enabled")
         if payload.model not in models:
             raise HTTPException(400, "Unsupported detector model")
@@ -407,7 +477,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await camera.stop()
 
         selected_settings = configured.model_copy(
-            update={"detector_backend": "yolo", "detector_model": models[payload.model]}
+            update={
+                "detector_model": models[payload.model],
+                "detector_prompts": current.detector_prompts
+                or configured.detector_prompts,
+            }
         )
         try:
             detector = await run_in_threadpool(create_detector, selected_settings)
@@ -433,6 +507,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except CameraUnavailable as exc:
                 raise HTTPException(503, str(exc)) from exc
         return await state_store.snapshot()
+
+    @app.post("/api/detector/prompts", response_model=AppState)
+    async def select_detector_prompts(payload: DetectorPromptRequest, request: Request):
+        if configured.detector_backend != "yoloe":
+            raise HTTPException(409, "The selected detector does not support text prompts")
+        approved = {
+            item.casefold(): item for item in configured.detector_prompt_allowlist
+        }
+        requested = [" ".join(item.strip().lower().split()) for item in payload.prompts]
+        if len(set(requested)) != len(requested) or any(
+            item.casefold() not in approved for item in requested
+        ):
+            raise HTTPException(400, "Detector prompts must use the approved vocabulary")
+        prompts = [approved[item.casefold()] for item in requested]
+        await _apply_detector_prompts(request.app, prompts)
+        return await request.app.state.state_store.mutate(
+            lambda state: setattr(state, "detector_prompt_auto_update", payload.auto_update)
+        )
 
     @app.post("/api/auto-analyse", response_model=AppState)
     async def auto_analyse(payload: AutoAnalyseRequest, request: Request):
@@ -516,7 +608,15 @@ async def _automatic_analysis(app: FastAPI) -> None:
         if not image:
             image = app.state.registry.image_path(state.replay_scenario).read_bytes()
         try:
-            await app.state.analysis.analyse(image, state.selected_question)
+            analysis_result, applied = await app.state.analysis.analyse(
+                image, state.selected_question
+            )
+            if applied:
+                await _refresh_detector_prompts_from_analysis(
+                    app,
+                    app.state.settings,
+                    [item.label for item in analysis_result.objects],
+                )
         except (RuntimeError, ValueError, AnalysisBusy):
             pass
 

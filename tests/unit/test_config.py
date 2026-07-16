@@ -78,6 +78,20 @@ def test_detector_model_must_be_in_configured_options():
         )
 
 
+def test_yoloe_requires_an_explicit_local_text_encoder():
+    with pytest.raises(ValidationError, match="DETECTOR_TEXT_ENCODER is required"):
+        Settings(_env_file=None, detector_backend="yoloe")
+
+
+def test_detector_prompts_must_be_in_approved_vocabulary():
+    with pytest.raises(ValidationError, match="DETECTOR_PROMPTS must be present"):
+        Settings(
+            _env_file=None,
+            detector_prompts=["person", "visitor identity"],
+            detector_prompt_allowlist=["person"],
+        )
+
+
 @pytest.mark.parametrize("port", [3600, 8000, 8600, 8610, 8699])
 def test_scenechat_must_own_only_port_3700(port):
     with pytest.raises(ValidationError, match="SCENECHAT_PORT must be 3700"):

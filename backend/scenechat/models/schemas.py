@@ -64,6 +64,8 @@ class AppState(BaseModel):
     camera_device: int = 0
     detector_backend: str = "replay"
     detector_model: str | None = None
+    detector_prompts: list[str] = Field(default_factory=list)
+    detector_prompt_auto_update: bool = False
     replay_scenario: str = "demo_booth"
     detections: list[Detection] = Field(default_factory=list)
     scene_analysis: SceneAnalysis | None = None

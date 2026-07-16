@@ -19,6 +19,11 @@ dependencies = [
 [project.optional-dependencies]
 camera = ["opencv-python-headless>=4.10,<5"]
 yolo = ["opencv-python-headless>=4.10,<5", "ultralytics>=8.3,<9"]
+yoloe = [
+  "opencv-python-headless>=4.10,<5",
+  "ultralytics>=8.4,<9",
+  "clip @ git+https://github.com/ultralytics/CLIP.git@0fa238b2ba553fe76dc158348d8e34625e3e2470",
+]
 test = ["pytest>=8.3,<9"]
 
 [tool.hatch.build.targets.wheel]

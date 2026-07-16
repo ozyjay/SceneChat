@@ -88,6 +88,31 @@ DETECTOR_MODEL_OPTIONS={"yolo11n":"/path/to/yolo11n.pt","yolo11s":"/path/to/yolo
 
 The **Object detector model** selector pauses and restarts an active camera while the selected model loads. SceneChat never accepts an arbitrary model path from the browser and never downloads detector weights at public-demo start-up.
 
+### Promptable YOLOE detector
+
+Download one official YOLOE checkpoint and its MobileCLIP2 text encoder explicitly:
+
+```powershell
+pwsh -NoProfile -File scripts/download_yoloe.ps1 -Variant s
+& .venv/bin/python -m pip install -e '.[yoloe]'
+```
+
+Use `-Variant m`, `-Variant l`, or `-Variant all` when those larger local variants are required. The script verifies pinned SHA-256 checksums and refuses to replace an unrecognised existing file.
+
+Configure the promptable detector with local paths only:
+
+```env
+DETECTOR_BACKEND=yoloe
+DETECTOR_MODEL=/path/to/models/yoloe-26s-seg.pt
+DETECTOR_MODEL_OPTIONS={"yoloe-26s":"/path/to/models/yoloe-26s-seg.pt"}
+DETECTOR_TEXT_ENCODER=/path/to/models/mobileclip2_b.ts
+DETECTOR_PROMPTS=["person","computer mouse","keyboard","laptop","monitor"]
+DETECTOR_PROMPT_ALLOWLIST=["person","computer mouse","keyboard","laptop","monitor","mobile phone","camera","microphone","bottle","cup","chair","table","book","backpack","cabinet"]
+DETECTOR_PROMPT_AUTO_UPDATE=false
+```
+
+Operators can select active prompts from the approved vocabulary. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in Gemma's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
+
 To probe one approved non-visitor image through ModelDeck:
 
 ```powershell
