@@ -1,5 +1,6 @@
 """Validated application configuration."""
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
 
     detector_backend: str = "replay"
     detector_model: str = ""
+    detector_model_options: dict[str, str] = Field(default_factory=dict)
     detector_confidence: float = Field(default=0.40, ge=0, le=1)
 
     model_provider: str = "fallback"
@@ -82,12 +84,32 @@ class Settings(BaseSettings):
             raise ValueError("must be auto, none, replay, or yolo")
         return value
 
+    @field_validator("detector_model_options")
+    @classmethod
+    def validate_detector_model_options(cls, value: dict[str, str]) -> dict[str, str]:
+        for model_id, path in value.items():
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", model_id):
+                raise ValueError(
+                    "model identifiers must use only letters, numbers, '.', '_' or '-'"
+                )
+            if not path.strip():
+                raise ValueError("model paths must not be empty")
+        if len(set(value.values())) != len(value):
+            raise ValueError("model paths must be unique")
+        return value
+
     @model_validator(mode="after")
     def apply_safety_rules(self) -> "Settings":
         if self.store_frames or self.store_video:
             raise ValueError("visitor frame and video storage are not supported")
         if self.scenechat_port != SCENECHAT_PORT:
             raise ValueError(f"SCENECHAT_PORT must be {SCENECHAT_PORT}")
+        if (
+            self.detector_model_options
+            and self.detector_model
+            and self.detector_model not in self.detector_model_options.values()
+        ):
+            raise ValueError("DETECTOR_MODEL must be present in DETECTOR_MODEL_OPTIONS")
 
         parsed = urlparse(self.modeldeck_url)
         if (
@@ -106,6 +128,20 @@ class Settings(BaseSettings):
                 f"{MODELDECK_GATEWAY_PORT}"
             )
         return self
+
+    def available_detector_models(self) -> dict[str, str]:
+        """Return the server-configured detector allowlist keyed by public identifier."""
+        if self.detector_model_options:
+            return dict(self.detector_model_options)
+        if self.detector_model:
+            return {Path(self.detector_model).stem: self.detector_model}
+        return {}
+
+    def detector_model_id(self) -> str | None:
+        for model_id, path in self.available_detector_models().items():
+            if path == self.detector_model:
+                return model_id
+        return None
 
 
 @lru_cache

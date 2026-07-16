@@ -88,6 +88,10 @@ function renderOperator(next) {
   const cameraLabel = state.cameraLabels.get(String(next.camera_device)) || `Camera ${next.camera_device}`;
   $('cameraValue').textContent = next.camera_running ? `Running · ${cameraLabel}` : 'Stopped';
   $('fpsValue').textContent = next.camera_running ? `${next.detector_fps.toFixed(1)} FPS` : '—';
+  $('detectorValue').textContent = next.detector_model || next.detector_backend;
+  if (next.detector_model && document.activeElement !== $('detectorModelSelect')) {
+    $('detectorModelSelect').value = next.detector_model;
+  }
   $('providerValue').textContent = `${next.provider} · ${next.provider_available ? 'available' : 'unavailable'}`;
   $('latencyValue').textContent = next.last_model_latency_ms === null ? '—' : `${next.last_model_latency_ms.toFixed(0)} ms`;
   $('analysisValue').textContent = next.analysis_in_progress ? 'Running' : 'Idle';
@@ -151,6 +155,13 @@ function populateOperatorControls(config, initial) {
   for (const provider of config.providers) $('providerSelect').add(new Option(provider, provider));
   for (const scenario of config.scenarios) $('scenarioSelect').add(new Option(scenario.title, scenario.id));
   for (const question of config.questions) $('questionSelect').add(new Option(question, question));
+  const detectorModels = config.detector_models || [];
+  $('detectorModelControls').hidden = detectorModels.length === 0;
+  for (const model of detectorModels) {
+    $('detectorModelSelect').add(new Option(model.label, model.id));
+  }
+  $('detectorModelSelect').value = initial.detector_model || '';
+  $('applyDetectorModel').disabled = detectorModels.length < 2;
 
   const cameras = config.camera_devices || [{
     device: initial.camera_device,
@@ -190,6 +201,10 @@ function populateOperatorControls(config, initial) {
     return post('/api/camera/start', {device: Number(selected.value)});
   }, 'Camera start requested.');
   $('stopCamera').onclick = () => act(() => post('/api/camera/stop'), 'Camera stopped.');
+  $('applyDetectorModel').onclick = () => act(
+    () => post('/api/detector/model', {model: $('detectorModelSelect').value}),
+    'Object detector model switched.',
+  );
   $('triggerAnalysis').onclick = () => act(() => post('/api/analyse', {question: $('questionSelect').value}), 'Scene description updated.');
   $('clearAnalysis').onclick = () => act(() => post('/api/analysis/clear'), 'Scene description cleared.');
   $('applyAuto').onclick = () => act(() => post('/api/auto-analyse', {

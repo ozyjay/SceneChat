@@ -78,7 +78,15 @@ For the optional YOLO adapter and benchmark:
 & .venv/bin/python -m pip install -e '.[yolo]'
 ```
 
-Set `DETECTOR_MODEL` to a local model path. SceneChat never downloads detector weights at public-demo start-up.
+Set `DETECTOR_MODEL` to the default local model path. To permit operator switching, configure an explicit server-side allowlist; the browser receives identifiers rather than paths:
+
+```env
+DETECTOR_BACKEND=yolo
+DETECTOR_MODEL=/path/to/yolo11s.pt
+DETECTOR_MODEL_OPTIONS={"yolo11n":"/path/to/yolo11n.pt","yolo11s":"/path/to/yolo11s.pt"}
+```
+
+The **Object detector model** selector pauses and restarts an active camera while the selected model loads. SceneChat never accepts an arbitrary model path from the browser and never downloads detector weights at public-demo start-up.
 
 To probe one approved non-visitor image through ModelDeck:
 

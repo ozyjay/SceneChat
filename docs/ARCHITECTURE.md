@@ -14,6 +14,7 @@ validated state store -> SSE updates -> unified visitor/operator screen
 
 - `services/camera.py` owns camera resources on a background thread and retains only one encoded frame in memory. A newer frame replaces the older one.
 - `detection/` contains a no-op adapter and an optional local YOLO adapter. Replay annotations use the same normalised `Detection` schema.
+- Runtime detector switching is restricted to model paths allowlisted by the operator at start-up. Model loading runs off the asynchronous event loop, and an active camera is paused and restarted around the change.
 - `vision/` isolates deterministic offline providers and the ModelDeck gateway behind one provider protocol. ModelDeck may schedule its own workers on ports `8610–8699`; SceneChat never addresses those workers directly.
 - `services/analysis.py` limits analysis to one request, applies a timeout, validates output, and rejects a result after reset by comparing state generations.
 - `services/state.py` is the shared, concurrency-safe state boundary. The browser receives state through Server-Sent Events.

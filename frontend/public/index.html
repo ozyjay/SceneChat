@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=3">
+  <link rel="stylesheet" href="/assets/styles.css?v=4">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -87,6 +87,11 @@
           <legend>Camera device</legend>
           <div id="cameraChoices" class="camera-choices"></div>
         </fieldset>
+        <div id="detectorModelControls" hidden>
+          <label>Object detector model<select id="detectorModelSelect"></select></label>
+          <button id="applyDetectorModel" class="secondary-button">Switch detector model</button>
+          <p>The camera pauses while the selected allowlisted model loads, then restarts automatically.</p>
+        </div>
         <div class="button-row"><button id="startCamera" class="primary-button">Start camera</button><button id="stopCamera" class="secondary-button">Stop camera</button></div>
         <p>Camera support is optional. Replay remains available if the camera cannot start.</p>
       </section>
@@ -106,6 +111,7 @@
           <div><dt>Mode</dt><dd id="modeValue">—</dd></div>
           <div><dt>Camera</dt><dd id="cameraValue">—</dd></div>
           <div><dt>Camera processing rate</dt><dd id="fpsValue">—</dd></div>
+          <div><dt>Object detector</dt><dd id="detectorValue">—</dd></div>
           <div><dt>Provider</dt><dd id="providerValue">—</dd></div>
           <div><dt>Model latency</dt><dd id="latencyValue">—</dd></div>
           <div><dt>Analysis</dt><dd id="analysisValue">—</dd></div>
@@ -123,6 +129,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=3" defer></script>
+  <script src="/assets/public.js?v=4" defer></script>
 </body>
 </html>

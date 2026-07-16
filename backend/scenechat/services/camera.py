@@ -137,6 +137,7 @@ class CameraService:
             lambda state: (
                 setattr(state, "camera_running", False),
                 setattr(state, "detector_fps", 0.0),
+                setattr(state, "detections", []),
             )
         )
 

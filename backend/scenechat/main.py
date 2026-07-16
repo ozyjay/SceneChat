@@ -18,6 +18,7 @@ from fastapi.responses import (
 )
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from scenechat import __version__
 from scenechat.config import ROOT, Settings, get_settings
@@ -48,6 +49,10 @@ class ProviderRequest(BaseModel):
 
 class CameraRequest(BaseModel):
     device: int = Field(default=0, ge=0, le=32)
+
+
+class DetectorModelRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=64)
 
 
 class AutoAnalyseRequest(BaseModel):
@@ -105,6 +110,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 internal_mode=configured.scenechat_mode,
                 provider=initial_provider,
                 camera_device=configured.camera_device,
+                detector_backend=configured.detector_backend,
+                detector_model=configured.detector_model_id(),
                 replay_scenario=scenario.id,
                 detections=_detections_for_mode(
                     configured.scenechat_mode,
@@ -208,6 +215,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "modes": ["development", "live", "detector-only", "mock", "replay"],
             "providers": ["modeldeck", "replay", "fallback", "mock"],
             "detector_enabled": configured.detector_backend != "none",
+            "detector_models": (
+                [
+                    {"id": model_id, "label": model_id}
+                    for model_id in configured.available_detector_models()
+                ]
+                if configured.detector_backend in {"auto", "yolo"}
+                else []
+            ),
             "camera_devices": camera_devices,
             "scenarios": [
                 {"id": item.id, "title": item.title} for item in registry.all()
@@ -375,6 +390,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ),
             )
         )
+
+    @app.post("/api/detector/model", response_model=AppState)
+    async def select_detector_model(payload: DetectorModelRequest, request: Request):
+        models = configured.available_detector_models()
+        if configured.detector_backend not in {"auto", "yolo"} or not models:
+            raise HTTPException(409, "Live detector model switching is not enabled")
+        if payload.model not in models:
+            raise HTTPException(400, "Unsupported detector model")
+
+        camera = request.app.state.camera
+        state_store = request.app.state.state_store
+        current = await state_store.snapshot()
+        was_running = current.camera_running
+        if was_running:
+            await camera.stop()
+
+        selected_settings = configured.model_copy(
+            update={"detector_backend": "yolo", "detector_model": models[payload.model]}
+        )
+        try:
+            detector = await run_in_threadpool(create_detector, selected_settings)
+        except Exception as exc:
+            if was_running:
+                with suppress(CameraUnavailable):
+                    await camera.start(current.camera_device)
+            raise HTTPException(
+                503, "Detector model could not be loaded; the previous model remains selected"
+            ) from exc
+
+        camera.detector = detector
+        await state_store.mutate(
+            lambda state: (
+                setattr(state, "detector_model", payload.model),
+                setattr(state, "detections", []),
+                setattr(state, "staff_error", None),
+            )
+        )
+        if was_running:
+            try:
+                await camera.start(current.camera_device)
+            except CameraUnavailable as exc:
+                raise HTTPException(503, str(exc)) from exc
+        return await state_store.snapshot()
 
     @app.post("/api/auto-analyse", response_model=AppState)
     async def auto_analyse(payload: AutoAnalyseRequest, request: Request):

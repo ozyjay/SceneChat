@@ -1,7 +1,9 @@
 import httpx
 import pytest
 
+import scenechat.main as main_module
 from scenechat.config import Settings
+from scenechat.detection import NoopDetector
 from scenechat.main import create_app
 
 
@@ -38,6 +40,7 @@ async def test_health_public_state_and_pages():
         assert public.status_code == 200
         assert 'id="operator-controls"' in public.text
         assert 'id="cameraChoices"' in public.text
+        assert 'id="detectorModelSelect"' in public.text
         assert 'id="cameraDevice"' not in public.text
         staff = await client.get("/staff")
         assert staff.status_code == 307
@@ -147,3 +150,68 @@ async def test_fallback_provider_is_an_explicit_offline_selection():
         )
         assert response.status_code == 200
         assert response.json()["analysis"]["provider"] == "fallback"
+
+
+@pytest.mark.anyio
+async def test_operator_can_switch_only_allowlisted_detector_models(monkeypatch):
+    monkeypatch.setattr(main_module, "create_detector", lambda settings: NoopDetector())
+    settings = Settings(
+        _env_file=None,
+        scenechat_mode="live",
+        model_provider="mock",
+        detector_backend="yolo",
+        detector_model="/models/yolo11n.pt",
+        detector_model_options={
+            "yolo11n": "/models/yolo11n.pt",
+            "yolo11s": "/models/yolo11s.pt",
+        },
+    )
+    app = create_app(settings)
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+    try:
+        lifecycle_calls = []
+
+        async def stop_camera():
+            lifecycle_calls.append("stop")
+            await app.state.state_store.mutate(
+                lambda state: setattr(state, "camera_running", False)
+            )
+
+        async def start_camera(device):
+            lifecycle_calls.append(f"start:{device}")
+            await app.state.state_store.mutate(
+                lambda state: (
+                    setattr(state, "camera_running", True),
+                    setattr(state, "camera_device", device),
+                )
+            )
+
+        monkeypatch.setattr(app.state.camera, "stop", stop_camera)
+        monkeypatch.setattr(app.state.camera, "start", start_camera)
+        await app.state.state_store.mutate(
+            lambda state: (
+                setattr(state, "camera_running", True),
+                setattr(state, "camera_device", 4),
+            )
+        )
+        config = (await client.get("/api/config")).json()
+        assert config["detector_models"] == [
+            {"id": "yolo11n", "label": "yolo11n"},
+            {"id": "yolo11s", "label": "yolo11s"},
+        ]
+        switched = await client.post("/api/detector/model", json={"model": "yolo11s"})
+        assert switched.status_code == 200
+        assert switched.json()["detector_model"] == "yolo11s"
+        assert switched.json()["camera_running"] is True
+        assert lifecycle_calls == ["stop", "start:4"]
+        rejected = await client.post(
+            "/api/detector/model", json={"model": "../../arbitrary-model"}
+        )
+        assert rejected.status_code == 400
+    finally:
+        await client.aclose()
+        await lifespan.__aexit__(None, None, None)

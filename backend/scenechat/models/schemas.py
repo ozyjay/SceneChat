@@ -62,6 +62,8 @@ class AppState(BaseModel):
     privacy_screen: bool = False
     camera_running: bool = False
     camera_device: int = 0
+    detector_backend: str = "replay"
+    detector_model: str | None = None
     replay_scenario: str = "demo_booth"
     detections: list[Detection] = Field(default_factory=list)
     scene_analysis: SceneAnalysis | None = None

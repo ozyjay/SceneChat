@@ -10,7 +10,7 @@
 
 ## Camera and live mode
 
-In **Operator controls**, select the named camera, start it, and confirm the live image and camera processing rate. Select **live** and `modeldeck`. The no-detector configuration must show no object boxes or detector claims. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
+In **Operator controls**, select the named camera and, when configured, the allowlisted object detector model. Start the camera and confirm the live image and camera processing rate. Select **live** and `modeldeck`. The no-detector configuration must show no object boxes or detector claims. Detector switching briefly pauses and restarts the camera. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
 
 ## Between visitors
 

@@ -51,6 +51,33 @@ def test_modeldeck_model_must_use_scenechat_vision_alias():
         Settings(modeldeck_model="text-diffusion")
 
 
+def test_detector_model_options_are_an_explicit_allowlist():
+    settings = Settings(
+        _env_file=None,
+        detector_backend="yolo",
+        detector_model="/models/yolo11n.pt",
+        detector_model_options={
+            "yolo11n": "/models/yolo11n.pt",
+            "yolo11s": "/models/yolo11s.pt",
+        },
+    )
+
+    assert settings.available_detector_models() == {
+        "yolo11n": "/models/yolo11n.pt",
+        "yolo11s": "/models/yolo11s.pt",
+    }
+    assert settings.detector_model_id() == "yolo11n"
+
+
+def test_detector_model_must_be_in_configured_options():
+    with pytest.raises(ValidationError, match="present in DETECTOR_MODEL_OPTIONS"):
+        Settings(
+            _env_file=None,
+            detector_model="/models/unlisted.pt",
+            detector_model_options={"yolo11n": "/models/yolo11n.pt"},
+        )
+
+
 @pytest.mark.parametrize("port", [3600, 8000, 8600, 8610, 8699])
 def test_scenechat_must_own_only_port_3700(port):
     with pytest.raises(ValidationError, match="SCENECHAT_PORT must be 3700"):
