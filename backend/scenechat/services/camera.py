@@ -3,6 +3,7 @@
 import asyncio
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 from scenechat.config import Settings
@@ -13,6 +14,42 @@ from scenechat.services.state import StateStore
 
 class CameraUnavailable(RuntimeError):
     pass
+
+
+def discover_camera_devices(
+    sysfs_root: Path = Path("/sys/class/video4linux"),
+) -> list[dict[str, int | str]]:
+    """Return one labelled capture index for each physical Video4Linux device."""
+    cameras: dict[tuple[str, str], tuple[int, str]] = {}
+    try:
+        entries = sorted(
+            sysfs_root.glob("video*"), key=lambda path: int(path.name.removeprefix("video"))
+        )
+    except (OSError, ValueError):
+        return []
+
+    for entry in entries:
+        try:
+            index = int(entry.name.removeprefix("video"))
+            name = (entry / "name").read_text(encoding="utf-8").strip()
+            physical_device = str((entry / "device").resolve(strict=True))
+            stream_index_path = entry / "index"
+            if stream_index_path.is_file() and stream_index_path.read_text().strip() != "0":
+                continue
+        except (OSError, ValueError):
+            continue
+        key = (name, physical_device)
+        if key not in cameras or index < cameras[key][0]:
+            cameras[key] = (index, name)
+
+    return [
+        {
+            "device": index,
+            "name": name,
+            "label": f"{name} (video{index})",
+        }
+        for index, name in sorted(cameras.values())
+    ]
 
 
 class CameraService:
@@ -42,8 +79,12 @@ class CameraService:
             return list(self._latest_detections)
 
     async def start(self, device: int | None = None) -> None:
+        selected = self.settings.camera_device if device is None else device
         if self.running:
-            return
+            current = await self.state.snapshot()
+            if current.camera_device == selected:
+                return
+            await self.stop()
         try:
             import cv2  # noqa: F401
         except ImportError as exc:
@@ -53,12 +94,15 @@ class CameraService:
         self._stop.clear()
         self._ready.clear()
         self._start_error = None
-        selected = self.settings.camera_device if device is None else device
         self._thread = threading.Thread(
             target=self._capture_loop, args=(selected,), daemon=True, name="scenechat-camera"
         )
         self._thread.start()
-        opened = await asyncio.to_thread(self._ready.wait, 3)
+        loop = asyncio.get_running_loop()
+        ready_deadline = loop.time() + 3
+        while not self._ready.is_set() and loop.time() < ready_deadline:
+            await asyncio.sleep(0.05)
+        opened = self._ready.is_set()
         if not opened or self._start_error:
             self._stop.set()
             if self._thread:

@@ -19,7 +19,8 @@ from scenechat.detection import create_detector
 from scenechat.models import AppState, Detection, HealthStatus
 from scenechat.replay import ReplayRegistry
 from scenechat.services.analysis import AnalysisBusy, AnalysisService
-from scenechat.services.camera import CameraService, CameraUnavailable
+from scenechat.services.camera import CameraService, CameraUnavailable, discover_camera_devices
+from scenechat.services.runtime import shutdown_requested
 from scenechat.services.state import StateStore
 from scenechat.vision import ModelDeckProvider, MockVisionProvider, ReplayVisionProvider
 
@@ -184,11 +185,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/config")
     async def public_config(request: Request):
         registry = request.app.state.registry
+        camera_devices = discover_camera_devices()
+        if not any(
+            camera["device"] == configured.camera_device for camera in camera_devices
+        ):
+            camera_devices.append(
+                {
+                    "device": configured.camera_device,
+                    "name": f"Camera {configured.camera_device}",
+                    "label": f"Camera {configured.camera_device}",
+                }
+            )
         return {
             "questions": _load_questions(),
             "modes": ["development", "live", "detector-only", "mock", "replay"],
             "providers": ["modeldeck", "replay", "fallback", "mock"],
             "detector_enabled": configured.detector_backend != "none",
+            "camera_devices": camera_devices,
             "scenarios": [
                 {"id": item.id, "title": item.title} for item in registry.all()
             ],
@@ -226,12 +239,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def events(request: Request):
         async def stream():
             last_revision = -1
-            while not await request.is_disconnected():
-                snapshot = await request.app.state.state_store.snapshot()
-                if snapshot.revision != last_revision:
-                    last_revision = snapshot.revision
-                    yield f"data: {snapshot.model_dump_json()}\n\n"
-                await asyncio.sleep(0.35)
+            try:
+                while not shutdown_requested() and not await request.is_disconnected():
+                    snapshot = await request.app.state.state_store.snapshot()
+                    if snapshot.revision != last_revision:
+                        last_revision = snapshot.revision
+                        yield f"data: {snapshot.model_dump_json()}\n\n"
+                    await asyncio.sleep(0.35)
+            except asyncio.CancelledError:
+                return
 
         return StreamingResponse(stream(), media_type="text/event-stream")
 

@@ -116,6 +116,8 @@ async def test_live_mode_without_detector_uses_accurate_public_wording():
         config = (await client.get("/api/config")).json()
         assert config["detector_enabled"] is False
         assert config["providers"] == ["modeldeck", "replay", "fallback", "mock"]
+        assert config["camera_devices"]
+        assert all(camera["label"] for camera in config["camera_devices"])
         fallback = await client.post("/api/mode", json={"mode": "detector-only"})
         assert fallback.json()["mode"] == "Live camera only"
         assert fallback.json()["detections"] == []
