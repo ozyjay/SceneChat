@@ -73,9 +73,22 @@ def test_detector_model_must_be_in_configured_options():
     with pytest.raises(ValidationError, match="present in DETECTOR_MODEL_OPTIONS"):
         Settings(
             _env_file=None,
+            detector_backend="yolo",
             detector_model="/models/unlisted.pt",
             detector_model_options={"yolo11n": "/models/yolo11n.pt"},
         )
+
+
+@pytest.mark.parametrize("backend", ["none", "replay"])
+def test_offline_detector_modes_ignore_stale_live_model_selection(backend):
+    settings = Settings(
+        _env_file=None,
+        detector_backend=backend,
+        detector_model="/models/stale.pt",
+        detector_model_options={"yoloe-26s": "/models/yoloe-26s-seg.pt"},
+    )
+
+    assert settings.detector_backend == backend
 
 
 def test_yoloe_requires_an_explicit_local_text_encoder():

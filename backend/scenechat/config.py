@@ -146,7 +146,8 @@ class Settings(BaseSettings):
         if self.scenechat_port != SCENECHAT_PORT:
             raise ValueError(f"SCENECHAT_PORT must be {SCENECHAT_PORT}")
         if (
-            self.detector_model_options
+            self.detector_backend in {"auto", "yolo", "yoloe"}
+            and self.detector_model_options
             and self.detector_model
             and self.detector_model not in self.detector_model_options.values()
         ):
