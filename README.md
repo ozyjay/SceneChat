@@ -111,6 +111,8 @@ DETECTOR_PROMPT_ALLOWLIST=["person","computer mouse","keyboard","laptop","monito
 DETECTOR_PROMPT_AUTO_UPDATE=false
 ```
 
+Start the combined live camera and detector application with `scripts/run_live.ps1`. Do not use `scripts/run_modeldeck.ps1` for this workflow because that provider-only launcher deliberately disables SceneChat object detection.
+
 Operators can select active prompts from the approved vocabulary. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in Gemma's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
 
 To probe one approved non-visitor image through ModelDeck:
