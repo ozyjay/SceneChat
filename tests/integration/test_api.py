@@ -35,7 +35,10 @@ class AppClient:
 async def test_health_public_state_and_pages():
     async with AppClient() as client:
         assert (await client.get("/")).status_code == 200
-        assert (await client.get("/staff")).status_code == 200
+        staff = await client.get("/staff")
+        assert staff.status_code == 200
+        assert 'id="cameraChoices"' in staff.text
+        assert 'id="cameraDevice"' not in staff.text
         health = await client.get("/api/health")
         assert health.status_code == 200
         assert health.json()["status"] == "ok"

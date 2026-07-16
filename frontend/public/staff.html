@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat staff controls</title>
-  <link rel="stylesheet" href="/assets/styles.css">
+  <link rel="stylesheet" href="/assets/styles.css?v=2">
 </head>
 <body class="staff-page">
   <header class="staff-header">
@@ -32,7 +32,10 @@
 
     <section class="control-panel">
       <h2>Camera</h2>
-      <label>Camera device<select id="cameraDevice"></select></label>
+      <fieldset class="camera-options">
+        <legend>Camera device</legend>
+        <div id="cameraChoices" class="camera-choices"></div>
+      </fieldset>
       <div class="button-row"><button id="startCamera" class="primary-button">Start camera</button><button id="stopCamera" class="secondary-button">Stop camera</button></div>
       <p>Camera support is optional. Replay remains available if the camera cannot start.</p>
     </section>
@@ -62,6 +65,6 @@
     </section>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/staff.js" defer></script>
+  <script src="/assets/staff.js?v=2" defer></script>
 </body>
 </html>

@@ -23,7 +23,10 @@ function render(state) {
   $('analysisValue').textContent = state.analysis_in_progress ? 'Running' : 'Idle';
   $('autoEnabled').checked = state.auto_analyse;
   $('autoInterval').value = state.auto_analyse_interval_seconds;
-  $('cameraDevice').value = state.camera_device;
+  if (state.camera_running) {
+    const activeCamera = document.querySelector(`input[name="cameraDevice"][value="${state.camera_device}"]`);
+    if (activeCamera) activeCamera.checked = true;
+  }
   $('staffError').hidden = !state.staff_error;
   $('staffError').textContent = state.staff_error || '';
 }
@@ -43,7 +46,19 @@ async function initialise() {
     device: initial.camera_device,
     label: `Camera ${initial.camera_device}`,
   }];
-  for (const camera of cameras) $('cameraDevice').add(new Option(camera.label, camera.device));
+  for (const camera of cameras) {
+    const label = document.createElement('label');
+    label.className = 'camera-choice';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'cameraDevice';
+    input.value = camera.device;
+    input.checked = camera.device === initial.camera_device;
+    const name = document.createElement('span');
+    name.textContent = camera.label;
+    label.append(input, name);
+    $('cameraChoices').append(label);
+  }
   $('modeSelect').value = initial.internal_mode; $('providerSelect').value = initial.provider; $('scenarioSelect').value = initial.replay_scenario;
   render(initial); $('healthValue').textContent = health.status;
   const events = new EventSource('/api/events'); events.onmessage = (event) => render(JSON.parse(event.data));
@@ -57,7 +72,11 @@ async function initialise() {
     await post('/api/mode', {mode: $('modeSelect').value});
     return post('/api/provider', {provider: $('providerSelect').value});
   }, 'Mode and provider updated.');
-  $('startCamera').onclick = () => act(() => post('/api/camera/start', {device: Number($('cameraDevice').value)}), 'Camera start requested.');
+  $('startCamera').onclick = () => act(() => {
+    const selected = document.querySelector('input[name="cameraDevice"]:checked');
+    if (!selected) throw new Error('Choose a camera first.');
+    return post('/api/camera/start', {device: Number(selected.value)});
+  }, 'Camera start requested.');
   $('stopCamera').onclick = () => act(() => post('/api/camera/stop'), 'Camera stopped.');
   $('triggerAnalysis').onclick = () => act(() => post('/api/analyse', {question: $('questionSelect').value}), 'Scene description updated.');
   $('clearAnalysis').onclick = () => act(() => post('/api/analysis/clear'), 'Scene description cleared.');

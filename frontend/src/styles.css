@@ -65,6 +65,13 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .control-panel select, .control-panel input { width: 100%; padding: .75rem; color: var(--ink); background: #0a1c23; border: 1px solid var(--line); border-radius: .5rem; }
 .control-panel select { color-scheme: dark; color: #f4f8f9; background-color: #0a1c23; }
 .control-panel select option { color: #f4f8f9; background-color: #0a1c23; }
+.camera-options { margin: .8rem 0; padding: 0; border: 0; }
+.camera-options legend { margin-bottom: .45rem; color: var(--muted); font-weight: 650; }
+.camera-choices { display: grid; gap: .55rem; }
+.camera-choice { display: flex !important; grid-template-columns: none !important; align-items: center; gap: .7rem !important; margin: 0 !important; padding: .75rem .85rem; color: var(--ink) !important; background: #0a1c23; border: 1px solid var(--line); border-radius: .55rem; cursor: pointer; }
+.camera-choice:has(input:checked) { color: #05272a !important; background: var(--teal); border-color: var(--teal); }
+.camera-choice input { width: 1.2rem !important; height: 1.2rem; margin: 0; accent-color: var(--teal-dark); }
+.camera-choice span { font-weight: 750; }
 .button-row { display: flex; gap: .7rem; flex-wrap: wrap; margin-top: 1rem; }
 .wide { width: 100%; }
 .inline-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: end; }
