@@ -12,6 +12,7 @@ def main() -> None:
         host=settings.scenechat_host,
         port=settings.scenechat_port,
         reload=False,
+        access_log=False,
     )
 
 
