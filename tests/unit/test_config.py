@@ -46,6 +46,11 @@ def test_modeldeck_gateway_is_allowed():
     assert settings.modeldeck_model == "scenechat-vision"
 
 
+def test_modeldeck_model_must_use_scenechat_vision_alias():
+    with pytest.raises(ValidationError, match="scenechat-vision gateway alias"):
+        Settings(modeldeck_model="text-diffusion")
+
+
 @pytest.mark.parametrize("port", [3600, 8000, 8600, 8610, 8699])
 def test_scenechat_must_own_only_port_3700(port):
     with pytest.raises(ValidationError, match="SCENECHAT_PORT must be 3700"):

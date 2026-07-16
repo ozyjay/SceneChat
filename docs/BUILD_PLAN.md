@@ -25,7 +25,7 @@
 ## Phase 3 — ModelDeck scene analysis
 
 **Goal:** use a multimodal model through the ModelDeck gateway without affecting detection.
-**Delivered foundation:** `ModelDeckProvider`, gateway-only URL validation, data-URL image input, structured response validation, prompt safeguards, one-request lock, timeout, timestamps, automatic interval, stale-result rejection, explicit replay fallback, and detector-only degradation.
+**Delivered foundation:** `ModelDeckProvider`, dedicated gateway vision routing, the pinned `scenechat-vision` alias, gateway-only URL validation, data-URL image input, structured response validation, prompt safeguards, one-request lock, timeout, timestamps, automatic interval, stale-result rejection, explicit replay fallback, and detector-only degradation.
 **Hardware gate:** exact gateway image request and combined-load measurements in `MODEL_COMPATIBILITY.md`. Concurrency, stale-result rejection, privacy blocking, automatic scheduling, and outage degradation have offline coverage. The physical ModelDeck gateway probe and two-hour camera-plus-model burn-in remain.
 
 ## Phase 4 — Open Day interface

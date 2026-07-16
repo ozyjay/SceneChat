@@ -68,6 +68,13 @@ class Settings(BaseSettings):
             raise ValueError("must be replay")
         return value
 
+    @field_validator("modeldeck_model")
+    @classmethod
+    def validate_modeldeck_model(cls, value: str) -> str:
+        if value != "scenechat-vision":
+            raise ValueError("must be the ModelDeck scenechat-vision gateway alias")
+        return value
+
     @field_validator("detector_backend")
     @classmethod
     def validate_detector(cls, value: str) -> str:

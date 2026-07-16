@@ -43,7 +43,7 @@ Use **Operator controls** on the main screen to configure the camera, mode and p
 | ModelDeck | Model gateway used by SceneChat | `8600` |
 | ModelDeck | Managed model workers | `8610–8699` |
 
-SceneChat binds only to `3700`. It sends model requests only to `http://127.0.0.1:8600` and never calls or binds ModelDeck management or worker ports. SceneChat does not start or stop ModelDeck workers.
+SceneChat binds only to `3700`. It sends model requests only to the dedicated `http://127.0.0.1:8600/v1/vision/analyse` gateway route using the `scenechat-vision` alias, and never calls or binds ModelDeck management or worker ports. SceneChat does not start or stop ModelDeck workers.
 
 ## Configuration
 

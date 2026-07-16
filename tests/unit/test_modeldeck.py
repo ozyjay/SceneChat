@@ -42,6 +42,11 @@ async def test_modeldeck_provider_uses_only_gateway_api_paths():
     assert result.provider == "modeldeck"
     assert [request.url.path for request in requests] == [
         "/v1/models",
-        "/v1/chat/completions",
+        "/v1/vision/analyse",
     ]
     assert {request.url.port for request in requests} == {8600}
+    vision_payload = json.loads(requests[1].content)
+    assert vision_payload["model"] == "approved-model"
+    assert vision_payload["messages"][0]["content"][0]["type"] == "image_url"
+    assert vision_payload["messages"][0]["content"][1]["type"] == "text"
+    assert vision_payload["response_format"] == {"type": "json_object"}

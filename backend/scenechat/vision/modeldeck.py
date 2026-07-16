@@ -1,4 +1,4 @@
-"""ModelDeck gateway adapter for OpenAI-compatible multimodal requests."""
+"""ModelDeck gateway adapter for dedicated SceneChat vision requests."""
 
 import base64
 import time
@@ -66,7 +66,7 @@ class ModelDeckProvider:
         }
         try:
             response = await self._client.post(
-                f"{self.gateway_url}/v1/chat/completions", json=payload
+                f"{self.gateway_url}/v1/vision/analyse", json=payload
             )
             response.raise_for_status()
             raw = response.json()["choices"][0]["message"]["content"]
