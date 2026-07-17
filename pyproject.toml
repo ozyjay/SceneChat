@@ -39,3 +39,6 @@ allow-direct-references = true
 [tool.pytest.ini_options]
 pythonpath = ["backend"]
 testpaths = ["tests"]
+markers = [
+  "hardware: opt-in tests requiring locally running hardware or model services",
+]
