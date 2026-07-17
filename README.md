@@ -78,7 +78,7 @@ For the promptable YOLOE and YOLO-World detector adapters:
 & .venv/bin/python -m pip install -e '.[yoloe,yoloworld]'
 ```
 
-Standard YOLO models are not supported. SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
+SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
 
 ```env
 DETECTOR_BACKEND=auto
@@ -90,7 +90,7 @@ DETECTOR_YOLOWORLD_CLIP=/path/to/models/ViT-B-32.pt
 
 The **Object detector model** selector pauses and restarts an active camera while the selected model loads. SceneChat never accepts an arbitrary model path from the browser and never downloads detector weights at public-demo start-up.
 
-### Promptable YOLOE detector
+### Promptable detector setup
 
 Download the default YOLOE and YOLO-World checkpoints and both required text encoders explicitly:
 
