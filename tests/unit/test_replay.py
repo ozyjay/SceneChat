@@ -10,6 +10,7 @@ def test_committed_replay_manifest_loads():
     scenario = registry.get("demo_booth")
     assert len(scenario.detections) >= 1
     assert registry.image_path(scenario.id).is_file()
+    assert registry.image_path(scenario.id).suffix.lower() in {".jpg", ".jpeg", ".png"}
 
 
 def test_replay_manifest_rejects_path_traversal(tmp_path):
@@ -29,4 +30,3 @@ def test_replay_manifest_rejects_path_traversal(tmp_path):
     path.write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="safe relative path"):
         ReplayRegistry(path)
-

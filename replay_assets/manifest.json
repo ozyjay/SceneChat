@@ -4,7 +4,7 @@
     {
       "id": "demo_booth",
       "title": "Prepared demonstration booth",
-      "image": "demo_booth.svg",
+      "image": "demo_booth.png",
       "detections": [
         {"label": "person", "confidence": 0.91, "x": 0.12, "y": 0.29, "width": 0.16, "height": 0.57},
         {"label": "person", "confidence": 0.89, "x": 0.74, "y": 0.31, "width": 0.15, "height": 0.55},
@@ -31,4 +31,3 @@
     }
   ]
 }
-

@@ -50,6 +50,15 @@ def _assert_safe_preconditions(state: AppState) -> None:
     assert state.internal_mode != "detector-only", "enable scene analysis before testing"
 
 
+async def _assert_raster_prepared_frame(client: httpx.AsyncClient) -> None:
+    response = await client.get("/api/frame")
+    assert response.status_code == 200
+    media_type = response.headers.get("content-type", "").partition(";")[0]
+    assert media_type in {"image/jpeg", "image/png"}, (
+        "the prepared benchmark frame is not a supported raster image; restart SceneChat"
+    )
+
+
 async def _request_analysis(
     client: httpx.AsyncClient, question: str
 ) -> tuple[float, SceneAnalysis, bool]:
@@ -75,6 +84,7 @@ async def test_modeldeck_scene_analysis_latency_and_schema_acceptance(capsys):
         assert state_response.status_code == 200, "SceneChat is not running on port 3700"
         initial_state = AppState.model_validate(state_response.json())
         _assert_safe_preconditions(initial_state)
+        await _assert_raster_prepared_frame(client)
 
         config_response = await client.get("/api/config")
         assert config_response.status_code == 200
@@ -143,7 +153,10 @@ async def test_reset_rejects_a_real_modeldeck_result_made_stale():
     timeout = httpx.Timeout(REQUEST_TIMEOUT_SECONDS)
     async with httpx.AsyncClient(base_url=SCENECHAT_URL, timeout=timeout) as client:
         initial = AppState.model_validate((await client.get("/api/state")).json())
+        if not initial.provider_available:
+            pytest.skip("the primary ModelDeck route check marked the provider unavailable")
         _assert_safe_preconditions(initial)
+        await _assert_raster_prepared_frame(client)
         await client.post("/api/analysis/clear")
 
         request_task = asyncio.create_task(
