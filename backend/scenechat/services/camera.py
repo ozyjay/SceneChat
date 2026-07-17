@@ -162,7 +162,10 @@ class CameraService:
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.settings.camera_width)
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.settings.camera_height)
         capture.set(cv2.CAP_PROP_FPS, self.settings.camera_fps)
-        frames = 0
+        detection_runs = 0
+        detections: list[Detection] = []
+        detection_interval = 1 / self.settings.detector_max_fps
+        next_detection_at = 0.0
         consecutive_read_failures = 0
         window_started = time.perf_counter()
         self._ready.set()
@@ -182,15 +185,18 @@ class CameraService:
                     time.sleep(0.1)
                     continue
                 consecutive_read_failures = 0
-                detections = self.detector.detect(frame)
+                now = time.perf_counter()
+                if now >= next_detection_at:
+                    detections = self.detector.detect(frame)
+                    detection_runs += 1
+                    next_detection_at = time.perf_counter() + detection_interval
                 encoded_ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
                 if not encoded_ok:
                     continue
-                frames += 1
                 elapsed = time.perf_counter() - window_started
                 if elapsed >= 1:
-                    self._fps = frames / elapsed
-                    frames = 0
+                    self._fps = detection_runs / elapsed
+                    detection_runs = 0
                     window_started = time.perf_counter()
                 with self._frame_lock:
                     # One latest frame only: older frames are dropped rather than queued.

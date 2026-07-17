@@ -38,7 +38,7 @@
 ## Phase 5 — hardening
 
 **Goal:** production rehearsal and freeze.  
-**Delivered foundation:** deterministic launch/check/smoke/stop scripts, privacy defaults, graceful resource release, and offline tests.  
+**Delivered foundation:** one deterministic `.env`-driven launcher, privacy defaults, graceful resource release, and offline tests.
 **Remaining model-focused gate:** freeze the ModelDeck model/worker artefacts, run the physical camera-disconnect and gateway-outage drills, complete the 60-minute camera test and two-hour camera-plus-model burn-in, cold reboot, and staff rehearsal. The earlier direct-runtime outage drill does not substitute for the ModelDeck gateway drill.
 
 ## Risks and go/no-go rules

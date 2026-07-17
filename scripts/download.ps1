@@ -1,26 +1,12 @@
-param(
-    [ValidateSet('yoloe', 'yoloworld', 'all')]
-    [string]$Detector = 'all',
-    [ValidateSet('s', 'm', 'l', 'all')]
-    [string]$YoloEVariant = 's',
-    [string]$Destination = (Join-Path $PSScriptRoot '../models')
-)
-
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+Set-Location (Join-Path $PSScriptRoot '..')
 
+$Destination = Join-Path (Get-Location) 'models'
 $Artifacts = @{
     'yoloe-26s-seg.pt' = @{
         Uri = 'https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26s-seg.pt'
         Sha256 = '48f24206bc8680d60cbbfa296b0140da849669b9515058b72f5a945142df0654'
-    }
-    'yoloe-26m-seg.pt' = @{
-        Uri = 'https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26m-seg.pt'
-        Sha256 = '585f5ec9028fd358035da8d860c27c56be285a795cba2076fba536a4391c2c83'
-    }
-    'yoloe-26l-seg.pt' = @{
-        Uri = 'https://github.com/ultralytics/assets/releases/download/v8.4.0/yoloe-26l-seg.pt'
-        Sha256 = 'a612d2d505f24e14d87ec82d688b823b6cb600646664f16125ce6c84ce360da9'
     }
     'mobileclip2_b.ts' = @{
         Uri = 'https://github.com/ultralytics/assets/releases/download/v8.4.0/mobileclip2_b.ts'
@@ -36,29 +22,13 @@ $Artifacts = @{
     }
 }
 
-$Names = @()
-if ($Detector -in @('yoloe', 'all')) {
-    $YoloEModels = if ($YoloEVariant -eq 'all') {
-        @('yoloe-26s-seg.pt', 'yoloe-26m-seg.pt', 'yoloe-26l-seg.pt')
-    } else {
-        ,"yoloe-26$YoloEVariant-seg.pt"
-    }
-    $Names += @($YoloEModels) + @('mobileclip2_b.ts')
-}
-if ($Detector -in @('yoloworld', 'all')) {
-    $Names += @('yolov8s-worldv2.pt', 'ViT-B-32.pt')
-}
-
 [void](New-Item -ItemType Directory -Force -Path $Destination)
-$Destination = (Resolve-Path $Destination).Path
-
-foreach ($Name in $Names) {
+foreach ($Name in $Artifacts.Keys | Sort-Object) {
     $Artifact = $Artifacts[$Name]
     $Target = Join-Path $Destination $Name
-    $ExpectedHash = $Artifact.Sha256
     if (Test-Path -PathType Leaf $Target) {
         $ExistingHash = (Get-FileHash -Algorithm SHA256 $Target).Hash.ToLowerInvariant()
-        if ($ExistingHash -eq $ExpectedHash) {
+        if ($ExistingHash -eq $Artifact.Sha256) {
             Write-Host "$Name is already downloaded and verified."
             continue
         }
@@ -70,7 +40,7 @@ foreach ($Name in $Names) {
         Write-Host "Downloading $Name..."
         Invoke-WebRequest -Uri $Artifact.Uri -OutFile $Temporary
         $ActualHash = (Get-FileHash -Algorithm SHA256 $Temporary).Hash.ToLowerInvariant()
-        if ($ActualHash -ne $ExpectedHash) {
+        if ($ActualHash -ne $Artifact.Sha256) {
             throw "Checksum verification failed for $Name."
         }
         Move-Item $Temporary $Target
@@ -82,4 +52,4 @@ foreach ($Name in $Names) {
     }
 }
 
-Write-Host 'Detector artefacts are ready. SceneChat will not download weights at start-up.'
+Write-Host 'Detector artefacts are ready. Run scripts/run.ps1 to start SceneChat.'

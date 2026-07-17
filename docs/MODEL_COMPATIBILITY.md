@@ -40,14 +40,11 @@ Approximate BF16 weights alone are about 10.2 GB for E2B and 16 GB for E4B, deri
 
 ## Required ModelDeck gateway probe
 
-Use the separate ModelDeck operating procedure to prepare the approved model, then record exact values here after running:
+Use the separate ModelDeck operating procedure to prepare the approved model, start SceneChat with `scripts/run.ps1`, then record exact values here after exercising scene analysis through the operator interface:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8600/v1/models
-$Env:MODEL_PROVIDER = 'modeldeck'
-$Env:MODELDECK_URL = 'http://127.0.0.1:8600'
-$Env:MODELDECK_MODEL = 'scenechat-vision'
-& .venv/bin/python scripts/test_modeldeck_image.py path/to/approved-test-image.jpg
+Invoke-RestMethod http://127.0.0.1:3700/api/health
 ```
 
 | Result | Value |

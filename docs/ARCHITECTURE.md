@@ -14,6 +14,7 @@ validated state store -> SSE updates -> unified visitor/operator screen
 
 - `services/camera.py` owns camera resources on a background thread and retains only one encoded frame in memory. A newer frame replaces the older one.
 - `detection/` contains no-op, local YOLOE, and local YOLO-World adapters. Standard YOLO checkpoints are not accepted. Replay annotations use the same normalised `Detection` schema.
+- Detector inference has an independent maximum rate and reuses the latest valid boxes between passes, preventing camera FPS from driving continuous CPU-heavy preprocessing.
 - Runtime detector switching is restricted to model paths allowlisted by the operator at start-up. Model loading runs off the asynchronous event loop, and an active camera is paused and restarted around the change.
 - The YOLOE and YOLO-World adapters apply locally encoded text prompts under the same lock used for inference. Operator choices and structured Gemma object labels are restricted to a configured, generic-object allowlist; summaries and other free-form text are never used as prompts.
 - `vision/` isolates deterministic offline providers and the ModelDeck gateway behind one provider protocol. ModelDeck may schedule its own workers on ports `8610–8699`; SceneChat never addresses those workers directly.

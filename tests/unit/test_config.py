@@ -127,6 +127,12 @@ def test_standard_yolo_backend_and_checkpoints_are_rejected():
         )
 
 
+@pytest.mark.parametrize("value", [0, 0.49, 30.1])
+def test_detector_rate_limit_has_safe_bounds(value):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, detector_max_fps=value)
+
+
 def test_detector_prompts_must_be_in_approved_vocabulary():
     with pytest.raises(ValidationError, match="DETECTOR_PROMPTS must be present"):
         Settings(

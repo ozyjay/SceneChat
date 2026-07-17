@@ -194,6 +194,72 @@ def test_capture_stops_and_clears_buffers_when_detector_fails(monkeypatch):
     assert service.latest_detections() == []
 
 
+def test_capture_limits_detector_runs_independently_of_camera_frames(monkeypatch):
+    class Frame:
+        shape = (720, 1280, 3)
+
+    class Encoded:
+        def tobytes(self):
+            return b"jpeg"
+
+    class FiniteCapture:
+        def __init__(self):
+            self.read_count = 0
+
+        def isOpened(self):
+            return self.read_count < 20
+
+        def set(self, property_id, value):
+            return True
+
+        def read(self):
+            self.read_count += 1
+            return True, Frame()
+
+        def release(self):
+            return None
+
+    class CountingDetector:
+        def __init__(self):
+            self.calls = 0
+
+        def detect(self, frame):
+            self.calls += 1
+            return []
+
+    class Clock:
+        def __init__(self):
+            self.value = 0.0
+
+        def __call__(self):
+            current = self.value
+            self.value += 0.05
+            return current
+
+    capture = FiniteCapture()
+    detector = CountingDetector()
+    cv2 = SimpleNamespace(
+        VideoCapture=lambda device: capture,
+        CAP_PROP_FRAME_WIDTH=1,
+        CAP_PROP_FRAME_HEIGHT=2,
+        CAP_PROP_FPS=3,
+        IMWRITE_JPEG_QUALITY=4,
+        imencode=lambda extension, frame, options: (True, Encoded()),
+    )
+    monkeypatch.setitem(sys.modules, "cv2", cv2)
+    monkeypatch.setattr("scenechat.services.camera.time.perf_counter", Clock())
+    service = CameraService(
+        Settings(_env_file=None, detector_max_fps=2),
+        detector,
+        StateStore(AppState()),
+    )
+
+    service._capture_loop(0)
+
+    assert capture.read_count == 20
+    assert 1 < detector.calls < capture.read_count
+
+
 @pytest.mark.anyio
 async def test_camera_monitor_clears_public_state_after_capture_failure():
     prepared = Detection(

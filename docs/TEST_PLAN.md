@@ -4,7 +4,7 @@
 
 The suite covers port ownership, ModelDeck gateway URL restrictions, the dedicated SceneChat vision route and alias, explicit provider/fallback selection, configuration safety, detector box validation, prompt safeguards, structured model parsing, replay manifest safety, state reset, stale response rejection, mock analysis, API health/state/reset/privacy, provider failure degradation, camera read and detector failure cleanup, and curated-question rejection. It must not require a camera, large model, model download, ModelDeck, or network.
 
-Run `& .venv/bin/python -m pytest` and `pwsh -NoProfile -File scripts/smoke_test.ps1` with the service active.
+Run `& .venv/bin/python -m pytest`.
 
 ## Optional hardware tests
 

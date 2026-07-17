@@ -3,10 +3,9 @@
 ## Cold start
 
 1. Confirm signs are visible and the camera points only into the demonstration area.
-2. Run `pwsh -NoProfile -File scripts/check_environment.ps1` and `pwsh -NoProfile -File scripts/check_ports.ps1`.
-3. If using a live model, confirm ModelDeck management at `http://127.0.0.1:3600` and its gateway at `http://127.0.0.1:8600`. ModelDeck, not SceneChat, owns worker start-up.
-4. Start `pwsh -NoProfile -File scripts/run_modeldeck.ps1` for the live path, or `pwsh -NoProfile -File scripts/run_replay.ps1` for the guaranteed offline demonstration.
-5. Open `http://127.0.0.1:3700/`, expand **Operator controls**, and confirm health, mode, camera, provider and latency. Collapse the panel and use the same page full-screen for visitors.
+2. Confirm ModelDeck management at `http://127.0.0.1:3600` and its gateway at `http://127.0.0.1:8600` when using the live provider. ModelDeck, not SceneChat, owns worker start-up.
+3. Run `pwsh -NoProfile -File scripts/run.ps1`. It starts the demo in the background and exits; runtime mode, provider, detectors, and fallback are controlled only by `.env`.
+4. Open `http://127.0.0.1:3700/`, expand **Operator controls**, and confirm health, mode, camera, provider and latency. Collapse the panel and use the same page full-screen for visitors.
 
 ## Camera and live mode
 
@@ -33,6 +32,6 @@ For a model failure, verify ModelDeck management and `http://127.0.0.1:8600/v1/m
 
 1. Activate the privacy screen.
 2. Reset the session and confirm temporary visitor-facing text is cleared.
-3. Run `pwsh -NoProfile -File scripts/stop.ps1` or stop the service gracefully from its terminal.
+3. Run `Stop-Process -Id (Get-Content .scenechat.pid)`.
 4. Confirm the camera indicator is off and no visitor media exists on disk.
 5. Leave ModelDeck worker shutdown to the separate ModelDeck operating procedure.

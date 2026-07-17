@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     detector_model: str = ""
     detector_model_options: dict[str, str] = Field(default_factory=dict)
     detector_confidence: float = Field(default=0.40, ge=0, le=1)
+    detector_max_fps: float = Field(default=5, ge=0.5, le=30)
     detector_text_encoder: str = ""
     detector_yoloworld_clip: str = ""
     detector_prompts: list[str] = Field(
