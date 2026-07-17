@@ -92,14 +92,14 @@ The **Object detector model** selector pauses and restarts an active camera whil
 
 ### Promptable YOLOE detector
 
-Download one official YOLOE checkpoint and its MobileCLIP2 text encoder explicitly:
+Download the default YOLOE and YOLO-World checkpoints and both required text encoders explicitly:
 
 ```powershell
-pwsh -NoProfile -File scripts/download_yoloe.ps1 -Variant s
-& .venv/bin/python -m pip install -e '.[yoloe]'
+pwsh -NoProfile -File scripts/download_detectors.ps1
+& .venv/bin/python -m pip install -e '.[yoloe,yoloworld]'
 ```
 
-Use `-Variant m`, `-Variant l`, or `-Variant all` when those larger local variants are required. The script verifies pinned SHA-256 checksums and refuses to replace an unrecognised existing file.
+Use `-Detector yoloe` or `-Detector yoloworld` to download only one family. Use `-YoloEVariant m`, `-YoloEVariant l`, or `-YoloEVariant all` when larger YOLOE variants are required. The script verifies pinned SHA-256 checksums, uses temporary partial files, and refuses to replace an unrecognised existing file. The former `download_yoloe.ps1` command remains as a compatibility wrapper.
 
 Configure the promptable detector with local paths only:
 
