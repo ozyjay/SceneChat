@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -6,8 +7,13 @@ import pytest
 
 from scenechat.config import Settings
 from scenechat.detection import NoopDetector
+from scenechat.main import _camera_monitor
 from scenechat.models import AppState, Detection
-from scenechat.services.camera import CameraService, discover_camera_devices
+from scenechat.services.camera import (
+    MAX_CONSECUTIVE_READ_FAILURES,
+    CameraService,
+    discover_camera_devices,
+)
 from scenechat.services.state import StateStore
 
 
@@ -104,3 +110,110 @@ async def test_start_clears_prepared_detections_from_live_camera(monkeypatch):
     assert state.camera_running is True
     assert state.detections == []
     await service.stop()
+
+
+def test_capture_stops_after_repeated_read_failures_and_clears_buffers(monkeypatch):
+    class FailedCapture:
+        def __init__(self):
+            self.read_count = 0
+
+        def isOpened(self):
+            return True
+
+        def set(self, property_id, value):
+            return True
+
+        def read(self):
+            self.read_count += 1
+            return False, None
+
+        def release(self):
+            return None
+
+    capture = FailedCapture()
+    cv2 = SimpleNamespace(
+        VideoCapture=lambda device: capture,
+        CAP_PROP_FRAME_WIDTH=1,
+        CAP_PROP_FRAME_HEIGHT=2,
+        CAP_PROP_FPS=3,
+    )
+    monkeypatch.setitem(sys.modules, "cv2", cv2)
+    monkeypatch.setattr("scenechat.services.camera.time.sleep", lambda seconds: None)
+    service = CameraService(Settings(_env_file=None), NoopDetector(), StateStore(AppState()))
+    service._latest_jpeg = b"stale frame"
+    service._latest_detections = [
+        Detection(label="person", confidence=0.9, x=0, y=0, width=0.5, height=0.5)
+    ]
+
+    service._capture_loop(0)
+
+    assert service._start_error == (
+        "Camera stopped returning frames; reconnect it before restarting."
+    )
+    assert service.latest_jpeg() is None
+    assert service.latest_detections() == []
+    assert service._fps == 0.0
+    assert capture.read_count == MAX_CONSECUTIVE_READ_FAILURES
+
+
+def test_capture_stops_and_clears_buffers_when_detector_fails(monkeypatch):
+    class Frame:
+        shape = (720, 1280, 3)
+
+    class WorkingCapture:
+        def isOpened(self):
+            return True
+
+        def set(self, property_id, value):
+            return True
+
+        def read(self):
+            return True, Frame()
+
+        def release(self):
+            return None
+
+    class FailedDetector:
+        def detect(self, frame):
+            raise RuntimeError("detector failed")
+
+    cv2 = SimpleNamespace(
+        VideoCapture=lambda device: WorkingCapture(),
+        CAP_PROP_FRAME_WIDTH=1,
+        CAP_PROP_FRAME_HEIGHT=2,
+        CAP_PROP_FPS=3,
+    )
+    monkeypatch.setitem(sys.modules, "cv2", cv2)
+    service = CameraService(Settings(_env_file=None), FailedDetector(), StateStore(AppState()))
+    service._latest_jpeg = b"stale frame"
+
+    service._capture_loop(0)
+
+    assert service._start_error == "Camera capture stopped after a camera or detector error."
+    assert service.latest_jpeg() is None
+    assert service.latest_detections() == []
+
+
+@pytest.mark.anyio
+async def test_camera_monitor_clears_public_state_after_capture_failure():
+    prepared = Detection(
+        label="stale person", confidence=0.9, x=0, y=0, width=0.5, height=0.5
+    )
+    store = StateStore(
+        AppState(camera_running=True, detector_fps=24, detections=[prepared])
+    )
+    camera = SimpleNamespace(
+        running=False,
+        _start_error="Camera disconnected or became unavailable.",
+    )
+    monitor = asyncio.create_task(_camera_monitor(camera, store))
+    await asyncio.sleep(0.3)
+    monitor.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await monitor
+
+    state = await store.snapshot()
+    assert state.camera_running is False
+    assert state.detector_fps == 0
+    assert state.detections == []
+    assert state.staff_error == "Camera disconnected or became unavailable."

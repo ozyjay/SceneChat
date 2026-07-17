@@ -573,6 +573,7 @@ async def _camera_monitor(camera: CameraService, state: StateStore) -> None:
                     lambda app_state: (
                         setattr(app_state, "camera_running", False),
                         setattr(app_state, "detector_fps", 0.0),
+                        setattr(app_state, "detections", []),
                         setattr(
                             app_state,
                             "staff_error",

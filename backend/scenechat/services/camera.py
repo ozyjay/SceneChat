@@ -16,6 +16,9 @@ class CameraUnavailable(RuntimeError):
     pass
 
 
+MAX_CONSECUTIVE_READ_FAILURES = 30
+
+
 def discover_camera_devices(
     sysfs_root: Path = Path("/sys/class/video4linux"),
     selected_device: int | None = None,
@@ -160,14 +163,25 @@ class CameraService:
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.settings.camera_height)
         capture.set(cv2.CAP_PROP_FPS, self.settings.camera_fps)
         frames = 0
+        consecutive_read_failures = 0
         window_started = time.perf_counter()
         self._ready.set()
         try:
-            while not self._stop.is_set() and capture.isOpened():
+            while not self._stop.is_set():
+                if not capture.isOpened():
+                    self._start_error = "Camera disconnected or became unavailable."
+                    break
                 ok, frame = capture.read()
                 if not ok:
+                    consecutive_read_failures += 1
+                    if consecutive_read_failures >= MAX_CONSECUTIVE_READ_FAILURES:
+                        self._start_error = (
+                            "Camera stopped returning frames; reconnect it before restarting."
+                        )
+                        break
                     time.sleep(0.1)
                     continue
+                consecutive_read_failures = 0
                 detections = self.detector.detect(frame)
                 encoded_ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 82])
                 if not encoded_ok:
@@ -183,7 +197,11 @@ class CameraService:
                     self._latest_jpeg = encoded.tobytes()
                     self._latest_detections = detections
         except Exception:
-            self._start_error = "Camera capture stopped after an internal camera or detector error."
+            self._start_error = "Camera capture stopped after a camera or detector error."
         finally:
+            with self._frame_lock:
+                self._latest_jpeg = None
+                self._latest_detections = []
+                self._fps = 0.0
             self._ready.set()
             capture.release()

@@ -23,7 +23,7 @@ validated state store -> SSE updates -> unified visitor/operator screen
 
 ## Failure isolation
 
-Provider failure leaves the previous valid description in place, exposes a concise staff error, and degrades a ModelDeck session to detector-only mode without changing the selected provider. Camera failure does not affect replay. The privacy flag hides the `/api/frame` response and public visual immediately. Reset never waits for model completion.
+Provider failure leaves the previous valid description in place, exposes a concise staff error, and degrades a ModelDeck session to detector-only mode without changing the selected provider. Repeated camera read failures terminate capture, clear the in-memory frame and detections, and prompt the operator to reconnect and restart; replay remains available. The privacy flag hides the `/api/frame` response and public visual immediately. Reset never waits for model completion.
 
 ## Runtime ownership
 
