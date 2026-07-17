@@ -76,6 +76,17 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .control-panel select option { color: #f4f8f9; background-color: #0a1c23; }
 .camera-options { margin: .8rem 0; padding: 0; border: 0; }
 .camera-options legend { margin-bottom: .45rem; color: var(--muted); font-weight: 650; }
+.prompt-options { margin: 1rem 0 .7rem; padding: 0; border: 0; }
+.prompt-options legend { margin-bottom: .55rem; color: var(--muted); font-weight: 700; }
+.prompt-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .5rem; }
+.control-panel .prompt-choice { display: flex; align-items: center; gap: .55rem; margin: 0; padding: .65rem .75rem; color: var(--ink); background: #0a1c23; border: 1px solid var(--line); border-radius: .65rem; cursor: pointer; }
+.control-panel .prompt-choice:has(input:checked) { color: #062128; background: var(--teal); border-color: var(--teal); }
+.control-panel .prompt-choice input { width: 1.15rem; height: 1.15rem; margin: 0; padding: 0; accent-color: #08313a; }
+.active-prompt-summary { padding: .8rem; background: #081920; border: 1px solid var(--line); border-radius: .7rem; }
+.active-prompt-summary strong { display: block; margin-bottom: .5rem; }
+.active-prompt-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.active-prompt-chip { padding: .3rem .6rem; color: #062128; background: var(--gold); border-radius: 999px; font-weight: 750; }
+.pending-change { margin: .65rem 0 0; color: var(--gold); font-weight: 700; }
 .camera-choices { display: grid; gap: .55rem; }
 .camera-choice { display: flex !important; grid-template-columns: none !important; align-items: center; gap: .7rem !important; margin: 0 !important; padding: .75rem .85rem; color: var(--ink) !important; background: #0a1c23; border: 1px solid var(--line); border-radius: .55rem; cursor: pointer; }
 .camera-choice:has(input:checked) { color: #05272a !important; background: var(--teal); border-color: var(--teal); }

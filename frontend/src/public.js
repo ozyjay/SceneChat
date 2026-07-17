@@ -83,6 +83,37 @@ function renderCounts(detections) {
   }
 }
 
+function selectedDetectorPrompts() {
+  return Array.from(
+    document.querySelectorAll('input[name="detectorPrompt"]:checked'),
+    input => input.value,
+  );
+}
+
+function renderActivePrompts(prompts) {
+  const panel = $('activePromptChips');
+  panel.replaceChildren();
+  for (const prompt of prompts) {
+    const chip = document.createElement('span');
+    chip.className = 'active-prompt-chip';
+    chip.textContent = prompt;
+    panel.append(chip);
+  }
+  if (!prompts.length) {
+    const empty = document.createElement('span');
+    empty.className = 'muted';
+    empty.textContent = 'No active prompts';
+    panel.append(empty);
+  }
+}
+
+function updatePromptPending() {
+  const active = new Set(state.current?.detector_prompts || []);
+  const selected = selectedDetectorPrompts();
+  const changed = selected.length !== active.size || selected.some(prompt => !active.has(prompt));
+  $('detectorPromptPending').hidden = !changed;
+}
+
 function renderOperator(next) {
   $('modeValue').textContent = next.internal_mode;
   const cameraLabel = state.cameraLabels.get(String(next.camera_device)) || `Camera ${next.camera_device}`;
@@ -92,12 +123,15 @@ function renderOperator(next) {
   if (next.detector_model && document.activeElement !== $('detectorModelSelect')) {
     $('detectorModelSelect').value = next.detector_model;
   }
-  if (document.activeElement !== $('detectorPromptSelect')) {
-    const activePrompts = new Set(next.detector_prompts || []);
-    for (const option of $('detectorPromptSelect').options) {
-      option.selected = activePrompts.has(option.value);
+  const activePrompts = next.detector_prompts || [];
+  renderActivePrompts(activePrompts);
+  if (document.activeElement?.name !== 'detectorPrompt') {
+    const activeSet = new Set(activePrompts);
+    for (const input of document.querySelectorAll('input[name="detectorPrompt"]')) {
+      input.checked = activeSet.has(input.value);
     }
   }
+  updatePromptPending();
   if (document.activeElement !== $('detectorPromptAutoUpdate')) {
     $('detectorPromptAutoUpdate').checked = next.detector_prompt_auto_update;
   }
@@ -174,10 +208,21 @@ function populateOperatorControls(config, initial) {
   const detectorPrompts = config.detector_prompt_allowlist || [];
   $('detectorPromptControls').hidden = !config.detector_prompting;
   for (const prompt of detectorPrompts) {
-    const option = new Option(prompt, prompt);
-    option.selected = (initial.detector_prompts || []).includes(prompt);
-    $('detectorPromptSelect').add(option);
+    const label = document.createElement('label');
+    label.className = 'prompt-choice';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'detectorPrompt';
+    input.value = prompt;
+    input.checked = (initial.detector_prompts || []).includes(prompt);
+    input.onchange = updatePromptPending;
+    const name = document.createElement('span');
+    name.textContent = prompt;
+    label.append(input, name);
+    $('detectorPromptChoices').append(label);
   }
+  renderActivePrompts(initial.detector_prompts || []);
+  updatePromptPending();
   $('detectorPromptAutoUpdate').checked = initial.detector_prompt_auto_update;
 
   const cameras = config.camera_devices || [{
@@ -223,7 +268,7 @@ function populateOperatorControls(config, initial) {
     'Object detector model switched.',
   );
   $('applyDetectorPrompts').onclick = () => act(() => {
-    const prompts = Array.from($('detectorPromptSelect').selectedOptions, option => option.value);
+    const prompts = selectedDetectorPrompts();
     if (!prompts.length) throw new Error('Choose at least one object prompt.');
     return post('/api/detector/prompts', {
       prompts,
@@ -260,6 +305,7 @@ async function initialise() {
   const [config, initial] = await Promise.all([request('/api/config'), request('/api/state')]);
   state.questions = config.questions;
   state.detectorEnabled = config.detector_enabled;
+  state.current = initial;
   const buttons = $('questionButtons');
   for (const question of config.questions) {
     const button = document.createElement('button');

@@ -18,7 +18,7 @@ SceneChat never switches to another live provider automatically. A ModelDeck fai
 
 ## Quick start
 
-Python 3.12 or newer and PowerShell 7 (`pwsh`) are required. SceneChat has three commands: setup, download, and run.
+Python 3.12 or newer and PowerShell 7 (`pwsh`) are required. SceneChat has four commands: setup, download, run, and stop.
 
 ```powershell
 pwsh -NoProfile -File scripts/setup.ps1
@@ -28,10 +28,10 @@ pwsh -NoProfile -File scripts/run.ps1
 
 Setup creates `.env` from `.env.example` when needed and installs the camera, test, YOLOE, and YOLO-World dependencies. Download fetches the two configured detector checkpoints and their text encoders with pinned SHA-256 verification. Run treats `.env` as authoritative, starts the demo in the background, writes `.scenechat.pid`, and exits so the terminal is immediately available.
 
-To stop the background demo:
+Run starts the demo in the background. Stop it with:
 
 ```powershell
-Stop-Process -Id (Get-Content .scenechat.pid)
+pwsh -NoProfile -File scripts/stop.ps1
 ```
 
 Open:

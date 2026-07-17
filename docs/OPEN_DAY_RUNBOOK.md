@@ -32,6 +32,6 @@ For a model failure, verify ModelDeck management and `http://127.0.0.1:8600/v1/m
 
 1. Activate the privacy screen.
 2. Reset the session and confirm temporary visitor-facing text is cleared.
-3. Run `Stop-Process -Id (Get-Content .scenechat.pid)`.
+3. Run `pwsh -NoProfile -File scripts/stop.ps1`.
 4. Confirm the camera indicator is off and no visitor media exists on disk.
 5. Leave ModelDeck worker shutdown to the separate ModelDeck operating procedure.
