@@ -9,18 +9,18 @@ if (-not (Test-Path -PathType Leaf $PidFile)) {
 
 $SceneChatPid = (Get-Content -Raw $PidFile).Trim()
 if ($SceneChatPid -notmatch '^\d+$') {
-    Remove-Item $PidFile
+    Remove-Item -Force $PidFile
     throw 'Removed an invalid SceneChat PID file.'
 }
 
 $Process = Get-Process -Id $SceneChatPid -ErrorAction SilentlyContinue
 if (-not $Process) {
-    Remove-Item $PidFile
+    Remove-Item -Force $PidFile
     Write-Host 'Removed a stale SceneChat PID file.'
     exit 0
 }
 
 Stop-Process -Id $SceneChatPid
 Wait-Process -Id $SceneChatPid -Timeout 5 -ErrorAction SilentlyContinue
-Remove-Item $PidFile
+Remove-Item -Force $PidFile
 Write-Host "SceneChat stopped (PID $SceneChatPid)."

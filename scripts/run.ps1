@@ -24,7 +24,7 @@ if (Test-Path -PathType Leaf $PidFile) {
         Write-Host "SceneChat is already running with PID $ExistingPid."
         exit 0
     }
-    Remove-Item $PidFile
+    Remove-Item -Force $PidFile
 }
 
 $StandardOutput = Join-Path (Get-Location) 'scenechat.log'
