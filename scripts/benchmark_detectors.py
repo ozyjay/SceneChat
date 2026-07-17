@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark explicitly supplied YOLO models on local video without downloading assets."""
+"""Benchmark explicitly supplied promptable detectors without downloading assets."""
 
 import argparse
 import statistics
@@ -7,13 +7,51 @@ import time
 from pathlib import Path
 
 
-def benchmark(video: Path, model_path: str, frame_limit: int) -> None:
+def create_benchmark_detector(
+    model_path: str,
+    text_encoder: str,
+    yoloworld_clip: str,
+    prompts: list[str],
+    confidence: float,
+):
     try:
-        import cv2
-        from ultralytics import YOLO
+        if Path(model_path).name.startswith("yoloe-"):
+            if not text_encoder:
+                raise SystemExit("--text-encoder is required when benchmarking YOLOE")
+            from scenechat.detection.yoloe import YoloEDetector
+
+            return YoloEDetector(model_path, text_encoder, confidence, prompts)
+        if "world" in Path(model_path).stem.lower():
+            if not yoloworld_clip:
+                raise SystemExit(
+                    "--yoloworld-clip is required when benchmarking YOLO-World"
+                )
+            from scenechat.detection.yoloworld import YoloWorldDetector
+
+            return YoloWorldDetector(model_path, yoloworld_clip, confidence, prompts)
+        raise SystemExit(
+            f"Unsupported detector checkpoint {model_path}; use YOLOE or YOLO-World"
+        )
     except ImportError as exc:
-        raise SystemExit("Install the 'yolo' optional dependency before benchmarking.") from exc
-    model = YOLO(model_path)
+        raise SystemExit(
+            "Install the matching 'yoloe' or 'yoloworld' optional dependency first."
+        ) from exc
+
+
+def benchmark(
+    video: Path,
+    model_path: str,
+    frame_limit: int,
+    text_encoder: str,
+    yoloworld_clip: str,
+    prompts: list[str],
+    confidence: float,
+) -> None:
+    import cv2
+
+    detector = create_benchmark_detector(
+        model_path, text_encoder, yoloworld_clip, prompts, confidence
+    )
     capture = cv2.VideoCapture(str(video))
     durations: list[float] = []
     count = 0
@@ -22,7 +60,7 @@ def benchmark(video: Path, model_path: str, frame_limit: int) -> None:
         if not ok:
             break
         started = time.perf_counter()
-        model.predict(frame, verbose=False)
+        detector.detect(frame)
         durations.append(time.perf_counter() - started)
         count += 1
     capture.release()
@@ -38,9 +76,29 @@ def main() -> None:
     parser.add_argument("video", type=Path)
     parser.add_argument("models", nargs="+", help="At least two local model paths are recommended")
     parser.add_argument("--frames", type=int, default=300)
+    parser.add_argument("--text-encoder", default="", help="Local MobileCLIP2 file for YOLOE")
+    parser.add_argument(
+        "--yoloworld-clip",
+        default="",
+        help="Local ViT-B/32 weights file for YOLO-World",
+    )
+    parser.add_argument(
+        "--prompts",
+        nargs="+",
+        default=["person", "camera", "laptop", "chair"],
+    )
+    parser.add_argument("--confidence", type=float, default=0.4)
     args = parser.parse_args()
     for model in args.models:
-        benchmark(args.video, model, args.frames)
+        benchmark(
+            args.video,
+            model,
+            args.frames,
+            args.text_encoder,
+            args.yoloworld_clip,
+            args.prompts,
+            args.confidence,
+        )
 
 
 if __name__ == "__main__":

@@ -159,11 +159,13 @@ async def test_operator_can_switch_only_allowlisted_detector_models(monkeypatch)
         _env_file=None,
         scenechat_mode="live",
         model_provider="mock",
-        detector_backend="yolo",
-        detector_model="/models/yolo11n.pt",
+        detector_backend="auto",
+        detector_model="/models/yolov8s-worldv2.pt",
+        detector_text_encoder="/models/mobileclip2_b.ts",
+        detector_yoloworld_clip="/models/ViT-B-32.pt",
         detector_model_options={
-            "yolo11n": "/models/yolo11n.pt",
-            "yolo11s": "/models/yolo11s.pt",
+            "yoloworld-s": "/models/yolov8s-worldv2.pt",
+            "yoloe-26s": "/models/yoloe-26s-seg.pt",
         },
     )
     app = create_app(settings)
@@ -200,12 +202,12 @@ async def test_operator_can_switch_only_allowlisted_detector_models(monkeypatch)
         )
         config = (await client.get("/api/config")).json()
         assert config["detector_models"] == [
-            {"id": "yolo11n", "label": "yolo11n"},
-            {"id": "yolo11s", "label": "yolo11s"},
+            {"id": "yoloworld-s", "label": "yoloworld-s"},
+            {"id": "yoloe-26s", "label": "yoloe-26s"},
         ]
-        switched = await client.post("/api/detector/model", json={"model": "yolo11s"})
+        switched = await client.post("/api/detector/model", json={"model": "yoloe-26s"})
         assert switched.status_code == 200
-        assert switched.json()["detector_model"] == "yolo11s"
+        assert switched.json()["detector_model"] == "yoloe-26s"
         assert switched.json()["camera_running"] is True
         assert lifecycle_calls == ["stop", "start:4"]
         rejected = await client.post(

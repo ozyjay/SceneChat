@@ -33,6 +33,7 @@ from scenechat.vision import ModelDeckProvider, MockVisionProvider, ReplayVision
 
 
 FRONTEND = ROOT / "frontend"
+PROMPTABLE_DETECTOR_BACKENDS = {"auto", "yoloe", "yoloworld"}
 
 
 class AnalyseRequest(BaseModel):
@@ -132,7 +133,10 @@ async def _refresh_detector_prompts_from_analysis(
     app: FastAPI, configured: Settings, labels: list[str]
 ) -> None:
     state = await app.state.state_store.snapshot()
-    if configured.detector_backend != "yoloe" or not state.detector_prompt_auto_update:
+    if (
+        configured.detector_backend not in PROMPTABLE_DETECTOR_BACKENDS
+        or not state.detector_prompt_auto_update
+    ):
         return
     prompts = _approved_detector_prompts(configured, labels)
     try:
@@ -162,12 +166,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 detector_model=configured.detector_model_id(),
                 detector_prompts=(
                     configured.detector_prompts
-                    if configured.detector_backend == "yoloe"
+                    if configured.detector_supports_prompts()
                     else []
                 ),
                 detector_prompt_auto_update=(
                     configured.detector_prompt_auto_update
-                    if configured.detector_backend == "yoloe"
+                    if configured.detector_supports_prompts()
                     else False
                 ),
                 replay_scenario=scenario.id,
@@ -278,13 +282,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     {"id": model_id, "label": model_id}
                     for model_id in configured.available_detector_models()
                 ]
-                if configured.detector_backend in {"auto", "yolo", "yoloe"}
+                if configured.detector_backend in PROMPTABLE_DETECTOR_BACKENDS
                 else []
             ),
-            "detector_prompting": configured.detector_backend == "yoloe",
+            "detector_prompting": configured.detector_supports_prompts(),
             "detector_prompt_allowlist": (
                 configured.detector_prompt_allowlist
-                if configured.detector_backend == "yoloe"
+                if configured.detector_supports_prompts()
                 else []
             ),
             "camera_devices": camera_devices,
@@ -464,7 +468,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.post("/api/detector/model", response_model=AppState)
     async def select_detector_model(payload: DetectorModelRequest, request: Request):
         models = configured.available_detector_models()
-        if configured.detector_backend not in {"auto", "yolo", "yoloe"} or not models:
+        if configured.detector_backend not in PROMPTABLE_DETECTOR_BACKENDS or not models:
             raise HTTPException(409, "Live detector model switching is not enabled")
         if payload.model not in models:
             raise HTTPException(400, "Unsupported detector model")
@@ -510,7 +514,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/detector/prompts", response_model=AppState)
     async def select_detector_prompts(payload: DetectorPromptRequest, request: Request):
-        if configured.detector_backend != "yoloe":
+        if configured.detector_backend not in PROMPTABLE_DETECTOR_BACKENDS:
             raise HTTPException(409, "The selected detector does not support text prompts")
         approved = {
             item.casefold(): item for item in configured.detector_prompt_allowlist

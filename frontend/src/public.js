@@ -229,7 +229,7 @@ function populateOperatorControls(config, initial) {
       prompts,
       auto_update: $('detectorPromptAutoUpdate').checked,
     });
-  }, 'YOLOE object prompts updated.');
+  }, 'Detector object prompts updated.');
   $('triggerAnalysis').onclick = () => act(() => post('/api/analyse', {question: $('questionSelect').value}), 'Scene description updated.');
   $('clearAnalysis').onclick = () => act(() => post('/api/analysis/clear'), 'Scene description cleared.');
   $('applyAuto').onclick = () => act(() => post('/api/auto-analyse', {

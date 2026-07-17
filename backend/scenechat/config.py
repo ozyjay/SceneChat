@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     detector_model_options: dict[str, str] = Field(default_factory=dict)
     detector_confidence: float = Field(default=0.40, ge=0, le=1)
     detector_text_encoder: str = ""
+    detector_yoloworld_clip: str = ""
     detector_prompts: list[str] = Field(
         default_factory=lambda: list(DEFAULT_DETECTOR_PROMPTS), min_length=1, max_length=20
     )
@@ -109,8 +110,8 @@ class Settings(BaseSettings):
     @field_validator("detector_backend")
     @classmethod
     def validate_detector(cls, value: str) -> str:
-        if value not in {"auto", "none", "replay", "yolo", "yoloe"}:
-            raise ValueError("must be auto, none, replay, yolo, or yoloe")
+        if value not in {"auto", "none", "replay", "yoloe", "yoloworld"}:
+            raise ValueError("must be auto, none, replay, yoloe, or yoloworld")
         return value
 
     @field_validator("detector_prompts", "detector_prompt_allowlist")
@@ -146,7 +147,7 @@ class Settings(BaseSettings):
         if self.scenechat_port != SCENECHAT_PORT:
             raise ValueError(f"SCENECHAT_PORT must be {SCENECHAT_PORT}")
         if (
-            self.detector_backend in {"auto", "yolo", "yoloe"}
+            self.detector_backend in {"auto", "yoloe", "yoloworld"}
             and self.detector_model_options
             and self.detector_model
             and self.detector_model not in self.detector_model_options.values()
@@ -154,8 +155,39 @@ class Settings(BaseSettings):
             raise ValueError("DETECTOR_MODEL must be present in DETECTOR_MODEL_OPTIONS")
         if not set(self.detector_prompts).issubset(self.detector_prompt_allowlist):
             raise ValueError("DETECTOR_PROMPTS must be present in DETECTOR_PROMPT_ALLOWLIST")
-        if self.detector_backend == "yoloe" and not self.detector_text_encoder:
+        configured_models = [
+            path
+            for path in [self.detector_model, *self.detector_model_options.values()]
+            if path
+        ]
+        if self.detector_backend == "yoloe" and any(
+            not Path(path).name.startswith("yoloe-") for path in configured_models
+        ):
+            raise ValueError("YOLOE detector models must use yoloe-* checkpoints")
+        if self.detector_backend == "yoloworld" and any(
+            "world" not in Path(path).stem.lower() for path in configured_models
+        ):
+            raise ValueError("YOLO-World detector models must use *world* checkpoints")
+        if self.detector_backend == "auto" and any(
+            not Path(path).name.startswith("yoloe-")
+            and "world" not in Path(path).stem.lower()
+            for path in configured_models
+        ):
+            raise ValueError("auto detector models must be YOLOE or YOLO-World checkpoints")
+        yoloe_selected = self.detector_backend == "yoloe" or (
+            self.detector_backend == "auto"
+            and any(Path(path).name.startswith("yoloe-") for path in configured_models)
+        )
+        if yoloe_selected and not self.detector_text_encoder:
             raise ValueError("DETECTOR_TEXT_ENCODER is required for the YOLOE backend")
+        yoloworld_selected = self.detector_backend == "yoloworld" or (
+            self.detector_backend == "auto"
+            and any("world" in Path(path).stem.lower() for path in configured_models)
+        )
+        if yoloworld_selected and not self.detector_yoloworld_clip:
+            raise ValueError(
+                "DETECTOR_YOLOWORLD_CLIP is required for the YOLO-World backend"
+            )
 
         parsed = urlparse(self.modeldeck_url)
         if (
@@ -188,6 +220,11 @@ class Settings(BaseSettings):
             if path == self.detector_model:
                 return model_id
         return None
+
+    def detector_supports_prompts(self) -> bool:
+        return self.detector_backend in {"yoloe", "yoloworld"} or (
+            self.detector_backend == "auto" and bool(self.available_detector_models())
+        )
 
 
 @lru_cache

@@ -12,7 +12,7 @@
 
 In **Operator controls**, select the named camera and, when configured, the allowlisted object detector model. Start the camera and confirm the live image and camera processing rate. Select **live** and `modeldeck`. The no-detector configuration must show no object boxes or detector claims. Detector switching briefly pauses and restarts the camera. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
 
-For YOLOE, select a small approved prompt set before opening. Enable automatic prompt updates only after confirming that Gemma's structured object labels remain suitable. The base prompts are restored whenever a new scene analysis does not return additional approved labels; reset continues to clear visitor-facing generated text but does not change the operator's detector configuration.
+For YOLOE or YOLO-World, select a small approved prompt set before opening. Enable automatic prompt updates only after confirming that Gemma's structured object labels remain suitable. The base prompts are restored whenever a new scene analysis does not return additional approved labels; reset continues to clear visitor-facing generated text but does not change the operator's detector configuration.
 
 ## Between visitors
 

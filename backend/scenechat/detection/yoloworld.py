@@ -1,5 +1,6 @@
-"""Promptable, offline YOLOE detector adapter."""
+"""Promptable, offline YOLO-World detector adapter."""
 
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -8,27 +9,34 @@ from scenechat.detection.base import normalise_box
 from scenechat.models import Detection
 
 
-class YoloEDetector:
-    name = "yoloe"
+class YoloWorldDetector:
+    name = "yoloworld"
 
     def __init__(
         self,
         model_path: str,
-        text_encoder_path: str,
+        clip_path: str,
         confidence: float,
         prompts: list[str],
     ):
         if not Path(model_path).is_file():
-            raise ValueError("DETECTOR_MODEL must identify a downloaded YOLOE checkpoint")
-        if not Path(text_encoder_path).is_file():
-            raise ValueError("DETECTOR_TEXT_ENCODER must identify a downloaded text encoder")
+            raise ValueError(
+                "DETECTOR_MODEL must identify a downloaded YOLO-World checkpoint"
+            )
+        clip_file = Path(clip_path)
+        if not clip_file.is_file() or clip_file.name != "ViT-B-32.pt":
+            raise ValueError(
+                "DETECTOR_YOLOWORLD_CLIP must identify a local ViT-B-32.pt file"
+            )
         try:
-            from ultralytics import YOLOE
+            from ultralytics import YOLOWorld
         except ImportError as exc:
-            raise RuntimeError("Install SceneChat with the 'yoloe' optional dependency") from exc
+            raise RuntimeError(
+                "Install SceneChat with the 'yoloworld' optional dependency"
+            ) from exc
 
-        self._model = YOLOE(model_path)
-        self._text_encoder_path = text_encoder_path
+        self._model = YOLOWorld(model_path)
+        self._clip_cache = str(clip_file.parent)
         self._confidence = confidence
         self._lock = threading.Lock()
         self._prompts: tuple[str, ...] = ()
@@ -40,25 +48,20 @@ class YoloEDetector:
             return list(self._prompts)
 
     def set_prompts(self, prompts: list[str]) -> None:
-        """Encode approved text prompts locally and apply them atomically."""
+        """Encode approved prompts locally and apply them between inference passes."""
         requested = tuple(prompts)
         with self._lock:
             if requested == self._prompts:
                 return
+            previous_cache = os.environ.get("CLIP_CACHE_DIR")
+            os.environ["CLIP_CACHE_DIR"] = self._clip_cache
             try:
-                import torch
-                from ultralytics.nn.text_model import MobileCLIPTS
-            except ImportError as exc:
-                raise RuntimeError("The YOLOE text encoder dependency is not installed") from exc
-
-            inner = self._model.model
-            device = next(inner.parameters()).device
-            with torch.inference_mode():
-                encoder = MobileCLIPTS(device, self._text_encoder_path)
-                tokens = encoder.tokenize(list(requested))
-                features = encoder.encode_text(tokens).reshape(1, len(requested), -1)
-                embeddings = inner.model[-1].get_tpe(features)
-                self._model.set_classes(list(requested), embeddings)
+                self._model.set_classes(list(requested))
+            finally:
+                if previous_cache is None:
+                    os.environ.pop("CLIP_CACHE_DIR", None)
+                else:
+                    os.environ["CLIP_CACHE_DIR"] = previous_cache
             self._prompts = requested
 
     def detect(self, frame: Any) -> list[Detection]:

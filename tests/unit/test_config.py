@@ -54,28 +54,31 @@ def test_modeldeck_model_must_use_scenechat_vision_alias():
 def test_detector_model_options_are_an_explicit_allowlist():
     settings = Settings(
         _env_file=None,
-        detector_backend="yolo",
-        detector_model="/models/yolo11n.pt",
+        detector_backend="auto",
+        detector_model="/models/yolov8s-worldv2.pt",
+        detector_text_encoder="/models/mobileclip2_b.ts",
+        detector_yoloworld_clip="/models/ViT-B-32.pt",
         detector_model_options={
-            "yolo11n": "/models/yolo11n.pt",
-            "yolo11s": "/models/yolo11s.pt",
+            "yoloworld-s": "/models/yolov8s-worldv2.pt",
+            "yoloe-26s": "/models/yoloe-26s-seg.pt",
         },
     )
 
     assert settings.available_detector_models() == {
-        "yolo11n": "/models/yolo11n.pt",
-        "yolo11s": "/models/yolo11s.pt",
+        "yoloworld-s": "/models/yolov8s-worldv2.pt",
+        "yoloe-26s": "/models/yoloe-26s-seg.pt",
     }
-    assert settings.detector_model_id() == "yolo11n"
+    assert settings.detector_model_id() == "yoloworld-s"
 
 
 def test_detector_model_must_be_in_configured_options():
     with pytest.raises(ValidationError, match="present in DETECTOR_MODEL_OPTIONS"):
         Settings(
             _env_file=None,
-            detector_backend="yolo",
+            detector_backend="yoloworld",
             detector_model="/models/unlisted.pt",
-            detector_model_options={"yolo11n": "/models/yolo11n.pt"},
+            detector_yoloworld_clip="/models/ViT-B-32.pt",
+            detector_model_options={"yoloworld-s": "/models/yolov8s-worldv2.pt"},
         )
 
 
@@ -94,6 +97,34 @@ def test_offline_detector_modes_ignore_stale_live_model_selection(backend):
 def test_yoloe_requires_an_explicit_local_text_encoder():
     with pytest.raises(ValidationError, match="DETECTOR_TEXT_ENCODER is required"):
         Settings(_env_file=None, detector_backend="yoloe")
+
+    with pytest.raises(ValidationError, match="DETECTOR_TEXT_ENCODER is required"):
+        Settings(
+            _env_file=None,
+            detector_backend="auto",
+            detector_model="/models/yoloe-26s-seg.pt",
+        )
+
+
+def test_yoloworld_requires_explicit_local_clip_weights():
+    with pytest.raises(ValidationError, match="DETECTOR_YOLOWORLD_CLIP is required"):
+        Settings(
+            _env_file=None,
+            detector_backend="yoloworld",
+            detector_model="/models/yolov8s-worldv2.pt",
+        )
+
+
+def test_standard_yolo_backend_and_checkpoints_are_rejected():
+    with pytest.raises(ValidationError, match="must be auto, none, replay"):
+        Settings(_env_file=None, detector_backend="yolo")
+
+    with pytest.raises(ValidationError, match="must be YOLOE or YOLO-World"):
+        Settings(
+            _env_file=None,
+            detector_backend="auto",
+            detector_model="/models/yolo11s.pt",
+        )
 
 
 def test_detector_prompts_must_be_in_approved_vocabulary():

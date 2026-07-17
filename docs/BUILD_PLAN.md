@@ -17,7 +17,7 @@
 ## Phase 2 — live detector
 
 **Goal:** add recoverable camera capture without delaying the UI.  
-**Delivered foundation:** optional OpenCV camera thread, latest-frame-only buffering, optional YOLO adapter, camera controls, frame endpoint, FPS state, privacy and detector-only controls.  
+**Delivered foundation:** optional OpenCV camera thread, latest-frame-only buffering, promptable YOLOE and YOLO-World adapters, camera controls, frame endpoint, FPS state, privacy and detector-only controls.
 **Hardware gate:** benchmark two local detector candidates, test device reconnection, then complete a 60-minute run. Do not select production detector weights before this comparison.
 
 **Current scope decision (11 July 2026):** production live-detector selection is deferred. Live model validation uses `DETECTOR_BACKEND=none`, while replay keeps prepared object labels. Detector benchmarks and licensing are not gating the current model-focused work, and the live UI must not claim object detection is active.

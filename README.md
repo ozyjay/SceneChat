@@ -72,18 +72,20 @@ With ModelDeck already running and the approved multimodal model available throu
 pwsh -NoProfile -File scripts/run_modeldeck.ps1
 ```
 
-For the optional YOLO adapter and benchmark:
+For the promptable YOLOE and YOLO-World detector adapters:
 
 ```powershell
-& .venv/bin/python -m pip install -e '.[yolo]'
+& .venv/bin/python -m pip install -e '.[yoloe,yoloworld]'
 ```
 
-Set `DETECTOR_MODEL` to the default local model path. To permit operator switching, configure an explicit server-side allowlist; the browser receives identifiers rather than paths:
+Standard YOLO models are not supported. SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
 
 ```env
-DETECTOR_BACKEND=yolo
-DETECTOR_MODEL=/path/to/yolo11s.pt
-DETECTOR_MODEL_OPTIONS={"yolo11n":"/path/to/yolo11n.pt","yolo11s":"/path/to/yolo11s.pt"}
+DETECTOR_BACKEND=auto
+DETECTOR_MODEL=/path/to/models/yoloe-26s-seg.pt
+DETECTOR_MODEL_OPTIONS={"yoloe-26s":"/path/to/models/yoloe-26s-seg.pt","yoloworld-s":"/path/to/models/yolov8s-worldv2.pt"}
+DETECTOR_TEXT_ENCODER=/path/to/models/mobileclip2_b.ts
+DETECTOR_YOLOWORLD_CLIP=/path/to/models/ViT-B-32.pt
 ```
 
 The **Object detector model** selector pauses and restarts an active camera while the selected model loads. SceneChat never accepts an arbitrary model path from the browser and never downloads detector weights at public-demo start-up.
@@ -111,9 +113,17 @@ DETECTOR_PROMPT_ALLOWLIST=["person","computer mouse","keyboard","laptop","monito
 DETECTOR_PROMPT_AUTO_UPDATE=false
 ```
 
+For YOLO-World alone, use `DETECTOR_BACKEND=yoloworld`, a local `yolov8s-worldv2.pt` checkpoint, and local ViT-B/32 text weights through `DETECTOR_YOLOWORLD_CLIP`. For an allowlist containing both detector families, use `DETECTOR_BACKEND=auto`; both local text encoders are required because either family may be selected. Obtain and approve all weights before the event—SceneChat validates the local files and never downloads them at start-up. The integration follows Ultralytics' documented `YOLOWorld(...).set_classes(...)` prompt API.
+
 Start the combined live camera and detector application with `scripts/run_live.ps1`. Do not use `scripts/run_modeldeck.ps1` for this workflow because that provider-only launcher deliberately disables SceneChat object detection.
 
-Operators can select active prompts from the approved vocabulary. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in Gemma's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
+Operators can select active prompts from the approved vocabulary for either detector family. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in Gemma's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
+
+Benchmark both candidates on the same approved booth video:
+
+```powershell
+& .venv/bin/python scripts/benchmark_detectors.py booth.mp4 models/yoloe-26s-seg.pt models/yolov8s-worldv2.pt --text-encoder models/mobileclip2_b.ts --yoloworld-clip models/ViT-B-32.pt --frames 300
+```
 
 To probe one approved non-visitor image through ModelDeck:
 

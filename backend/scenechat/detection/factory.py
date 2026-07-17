@@ -23,8 +23,15 @@ def create_detector(settings: Settings) -> Detector:
             settings.detector_confidence,
             settings.detector_prompts,
         )
-    if backend in {"auto", "yolo"}:
-        from scenechat.detection.yolo import YoloDetector
+    if backend == "yoloworld" or (
+        backend == "auto" and "world" in Path(settings.detector_model).stem.lower()
+    ):
+        from scenechat.detection.yoloworld import YoloWorldDetector
 
-        return YoloDetector(settings.detector_model, settings.detector_confidence)
+        return YoloWorldDetector(
+            settings.detector_model,
+            settings.detector_yoloworld_clip,
+            settings.detector_confidence,
+            settings.detector_prompts,
+        )
     raise ValueError(f"unsupported detector backend: {backend}")

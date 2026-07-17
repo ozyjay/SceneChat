@@ -67,6 +67,7 @@ $Env:MODELDECK_MODEL = 'scenechat-vision'
 
 ## Preliminary hardware record — 10 July 2026
 
+- The YOLO11 measurements below are retained as historical evidence only. Standard YOLO support has since been replaced by promptable YOLOE and YOLO-World candidates, which require a new same-video benchmark before live object detection is approved.
 - Camera device 0 sustained 1769 frames over 60.01 seconds at 1280×720, or 29.48 effective FPS, with no read failures. One Gemma request ran during this capture with 6039.4 ms latency. This is a short combined-load smoke test, not the required 60-minute camera run or two-hour burn-in.
 - Ten camera close/reopen cycles each opened successfully and returned a frame. A physical USB disconnect/reconnect drill is still required.
 - Detector comparison used live camera frames because no approved 300+ frame booth video was available. Both models used PyTorch 2.9.1 ROCm 7.2.1 and Ultralytics 8.4.90 on GPU device 0. Installed package metadata declares the Ultralytics licence as AGPL-3.0; suitability for public deployment still requires an explicit licence decision.
