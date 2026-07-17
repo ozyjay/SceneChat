@@ -38,6 +38,22 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .camera-footer { padding: .9rem 1.1rem; display: flex; justify-content: space-between; gap: 1rem; color: var(--muted); font-size: 1rem; }
 .interpretation-card { padding: 1.5rem; display: flex; flex-direction: column; }
 .interpretation-card h2 { font-size: clamp(1.45rem, 2.25vw, 2.35rem); line-height: 1.23; }
+.analysis-status { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .8rem; margin: .2rem 0 1rem; padding: .85rem 1rem; border: 2px solid var(--line); border-radius: .8rem; background: #0a1c23; }
+.analysis-status-indicator { width: 1rem; height: 1rem; border-radius: 50%; background: var(--muted); }
+.analysis-status strong, .analysis-status span { display: block; }
+.analysis-status strong { margin-bottom: .15rem; font-size: 1.05rem; }
+.analysis-status div > span { color: var(--muted); line-height: 1.35; }
+.analysis-status.ready { border-color: var(--line); }
+.analysis-status.ready .analysis-status-indicator { background: var(--teal); }
+.analysis-status.thinking { border-color: var(--gold); background: #3b321655; }
+.analysis-status.thinking .analysis-status-indicator { width: 1.15rem; height: 1.15rem; background: transparent; border: 3px solid #ffd16655; border-top-color: var(--gold); animation: analysis-spin .8s linear infinite; }
+.analysis-status.displayed { border-color: var(--teal); background: #0b3b3855; }
+.analysis-status.displayed .analysis-status-indicator { background: var(--teal); box-shadow: 0 0 0 .3rem #59d7cf25; }
+.analysis-status.unavailable { border-color: var(--danger); background: #541c2255; }
+.analysis-status.unavailable .analysis-status-indicator { background: var(--danger); }
+.analysis-status.disabled { opacity: .82; }
+@keyframes analysis-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .analysis-status.thinking .analysis-status-indicator { animation: none; } }
 .uncertainty { border-left: 5px solid var(--gold); background: #44381455; padding: .9rem 1rem; border-radius: .3rem; }
 .uncertainty ul { padding-left: 1.2rem; margin-bottom: 0; color: #f6e6b8; }
 .object-counts { margin-top: auto; padding-top: 1rem; }

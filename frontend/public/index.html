@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=7">
+  <link rel="stylesheet" href="/assets/styles.css?v=8">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -35,8 +35,15 @@
       </div>
     </section>
 
-    <aside class="interpretation-card">
+    <aside id="interpretationCard" class="interpretation-card">
       <p class="section-label">Likely scene interpretation</p>
+      <div id="analysisStatus" class="analysis-status ready" role="status" aria-live="polite" aria-atomic="true">
+        <span class="analysis-status-indicator" aria-hidden="true"></span>
+        <div>
+          <strong id="analysisStatusTitle">Ready for a question</strong>
+          <span id="analysisStatusDetail">Choose a question below to analyse the scene.</span>
+        </div>
+      </div>
       <h2 id="sceneSummary">Choose a question to generate a prepared scene description.</h2>
       <div id="uncertaintyPanel" class="uncertainty" hidden>
         <strong>Uncertain details</strong>
@@ -143,6 +150,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=7" defer></script>
+  <script src="/assets/public.js?v=8" defer></script>
 </body>
 </html>

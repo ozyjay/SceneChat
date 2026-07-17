@@ -150,6 +150,45 @@ function renderOperator(next) {
   $('staffError').textContent = next.staff_error || '';
 }
 
+function renderAnalysisStatus(next, analysis) {
+  const status = $('analysisStatus');
+  const title = $('analysisStatusTitle');
+  const detail = $('analysisStatusDetail');
+  const card = $('interpretationCard');
+  card.setAttribute('aria-busy', String(next.analysis_in_progress));
+
+  if (next.analysis_in_progress) {
+    status.className = 'analysis-status thinking';
+    title.textContent = 'Analysing the scene…';
+    detail.textContent = analysis
+      ? `Thinking about “${next.selected_question}”. The previous description remains visible below.`
+      : `Thinking about “${next.selected_question}”.`;
+    return;
+  }
+  if (next.internal_mode === 'detector-only') {
+    const unavailable = !next.provider_available;
+    status.className = `analysis-status ${unavailable ? 'unavailable' : 'disabled'}`;
+    title.textContent = unavailable ? 'Scene model unavailable' : 'Scene analysis disabled';
+    detail.textContent = unavailable
+      ? 'The camera and object detector can continue without scene descriptions.'
+      : 'Choose another operating mode to generate a description.';
+    return;
+  }
+  if (analysis) {
+    const generated = new Date(analysis.generated_at).toLocaleTimeString([], {
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    const latency = analysis.latency_ms === null ? '' : ` · ${analysis.latency_ms.toFixed(0)} ms`;
+    status.className = 'analysis-status displayed';
+    title.textContent = 'Scene description displayed';
+    detail.textContent = `${analysis.provider}${latency} · updated ${generated}`;
+    return;
+  }
+  status.className = 'analysis-status ready';
+  title.textContent = 'Ready for a question';
+  detail.textContent = 'Choose a question below to analyse the scene.';
+}
+
 function render(next) {
   state.current = next;
   $('modeBadge').textContent = next.mode;
@@ -159,6 +198,7 @@ function render(next) {
   renderDetections(next.privacy_screen ? [] : next.detections);
   renderCounts(next.privacy_screen ? [] : next.detections);
   const analysis = next.scene_analysis;
+  renderAnalysisStatus(next, analysis);
   $('sceneSummary').textContent = analysis?.summary || 'Choose a question to generate a scene description.';
   $('analysisTime').textContent = analysis
     ? `Description updated ${new Date(analysis.generated_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'})}`

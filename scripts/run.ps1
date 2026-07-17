@@ -27,8 +27,10 @@ if (Test-Path -PathType Leaf $PidFile) {
     Remove-Item -Force $PidFile
 }
 
-$StandardOutput = Join-Path (Get-Location) 'scenechat.log'
-$StandardError = Join-Path (Get-Location) 'scenechat-error.log'
+$LogDirectory = Join-Path (Get-Location) 'logs'
+[void](New-Item -ItemType Directory -Force -Path $LogDirectory)
+$StandardOutput = Join-Path $LogDirectory 'scenechat.log'
+$StandardError = Join-Path $LogDirectory 'scenechat-error.log'
 $Process = Start-Process `
     -FilePath (Resolve-Path .venv/bin/python) `
     -ArgumentList @('-m', 'scenechat') `

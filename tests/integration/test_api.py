@@ -44,6 +44,9 @@ async def test_health_public_state_and_pages():
         assert 'id="detectorPromptChoices"' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="detectorPromptSelect"' not in public.text
+        assert 'id="analysisStatus"' in public.text
+        assert 'id="analysisStatusTitle"' in public.text
+        assert 'id="analysisStatusDetail"' in public.text
         assert 'id="cameraDevice"' not in public.text
         staff = await client.get("/staff")
         assert staff.status_code == 307

@@ -26,7 +26,7 @@ pwsh -NoProfile -File scripts/download.ps1
 pwsh -NoProfile -File scripts/run.ps1
 ```
 
-Setup creates `.env` from `.env.example` when needed and installs the camera, test, YOLOE, and YOLO-World dependencies. Download fetches the two configured detector checkpoints and their text encoders with pinned SHA-256 verification. Run treats `.env` as authoritative, starts the demo in the background, writes `.scenechat.pid`, and exits so the terminal is immediately available.
+Setup creates `.env` from `.env.example` when needed and installs the camera, test, YOLOE, and YOLO-World dependencies. Download fetches the two configured detector checkpoints and their text encoders with pinned SHA-256 verification. Run treats `.env` as authoritative, starts the demo in the background, writes `.scenechat.pid`, stores process output under `logs/`, and exits so the terminal is immediately available.
 
 Run starts the demo in the background. Stop it with:
 
@@ -41,6 +41,8 @@ Open:
 - API reference: `http://127.0.0.1:3700/api/docs`
 
 Use **Operator controls** on the main screen to configure the camera, mode and provider or view diagnostics. The former `/staff` URL redirects to this panel for compatibility.
+
+The scene panel clearly reports when analysis is ready, actively thinking, displaying a completed result, disabled, or unavailable. A previous valid description remains labelled while a new request is running.
 
 ## Port ownership
 
