@@ -50,6 +50,9 @@ class SceneAnalysis(BaseModel):
     generated_at: datetime = Field(default_factory=utc_now)
     provider: str = Field(default="unknown", max_length=40)
     latency_ms: float | None = Field(default=None, ge=0)
+    prompt_tokens: int | None = Field(default=None, ge=0)
+    completion_tokens: int | None = Field(default=None, ge=0)
+    completion_token_limit: int | None = Field(default=None, ge=1)
 
 
 class AppState(BaseModel):

@@ -72,6 +72,7 @@ class Settings(BaseSettings):
     modeldeck_model: str = "scenechat-vision"
     model_fallback_mode: str = "replay"
     vision_request_timeout_seconds: float = Field(default=20, gt=0, le=120)
+    vision_max_tokens: int = Field(default=350, ge=128, le=512)
     auto_analyse: bool = False
     auto_analyse_interval_seconds: float = Field(default=5, ge=3, le=60)
 

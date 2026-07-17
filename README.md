@@ -66,9 +66,12 @@ SCENECHAT_PORT=3700
 MODEL_PROVIDER=modeldeck
 MODELDECK_URL=http://127.0.0.1:8600
 MODEL_FALLBACK_MODE=replay
+VISION_MAX_TOKENS=350
 ```
 
 Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or worker URLs are rejected at start-up. Storage of frames or video is also rejected by configuration.
+
+`VISION_MAX_TOKENS` limits the scene-description response, including its structured JSON. The default of 350 is intended to keep public-demo responses concise; values from 128 to 512 are accepted so model quality and latency can be compared deliberately.
 
 SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
 

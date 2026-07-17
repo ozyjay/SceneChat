@@ -20,11 +20,13 @@ class ModelDeckProvider:
         api_key: str,
         model: str,
         timeout: float,
+        max_tokens: int = 350,
         *,
         transport: httpx.AsyncBaseTransport | None = None,
     ):
         self.gateway_url = gateway_url.rstrip("/")
         self.model = model
+        self.max_tokens = max_tokens
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout), headers=headers, transport=transport
@@ -61,7 +63,7 @@ class ModelDeckProvider:
                 }
             ],
             "temperature": 0.1,
-            "max_tokens": 700,
+            "max_tokens": self.max_tokens,
             "response_format": {"type": "json_object"},
         }
         try:
@@ -69,9 +71,27 @@ class ModelDeckProvider:
                 f"{self.gateway_url}/v1/vision/analyse", json=payload
             )
             response.raise_for_status()
-            raw = response.json()["choices"][0]["message"]["content"]
+            response_payload = response.json()
+            raw = response_payload["choices"][0]["message"]["content"]
             analysis = parse_scene_analysis(raw, self.name)
             analysis.latency_ms = round((time.perf_counter() - started) * 1000, 1)
+            # Operational metrics come only from ModelDeck's trusted response
+            # envelope, never from model-generated JSON content.
+            analysis.prompt_tokens = None
+            analysis.completion_tokens = None
+            usage = response_payload.get("usage")
+            if isinstance(usage, dict):
+                analysis.prompt_tokens = _non_negative_int(usage.get("prompt_tokens"))
+                analysis.completion_tokens = _non_negative_int(
+                    usage.get("completion_tokens")
+                )
+            analysis.completion_token_limit = self.max_tokens
             return analysis
         except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
             raise VisionProviderError("The ModelDeck gateway is unavailable.") from exc
+
+
+def _non_negative_int(value: object) -> int | None:
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    return None

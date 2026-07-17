@@ -101,14 +101,28 @@ async def test_modeldeck_scene_analysis_latency_and_schema_acceptance(capsys):
             end_to_end_ms: list[float] = []
             gateway_ms: list[float] = []
             overhead_ms: list[float] = []
+            prompt_tokens: list[int] = []
+            completion_tokens: list[int] = []
+            completion_token_limits: list[int] = []
+            observed_completion_tokens_per_second: list[float] = []
             for index in range(MEASURED_REQUESTS):
                 elapsed, analysis, applied = await _request_analysis(
                     client, questions[index % len(questions)]
                 )
                 assert applied
+                assert analysis.prompt_tokens is not None
+                assert analysis.completion_tokens is not None
+                assert analysis.completion_token_limit is not None
+                assert analysis.latency_ms > 0
                 end_to_end_ms.append(elapsed)
                 gateway_ms.append(analysis.latency_ms)
                 overhead_ms.append(max(0.0, elapsed - analysis.latency_ms))
+                prompt_tokens.append(analysis.prompt_tokens)
+                completion_tokens.append(analysis.completion_tokens)
+                completion_token_limits.append(analysis.completion_token_limit)
+                observed_completion_tokens_per_second.append(
+                    analysis.completion_tokens / (analysis.latency_ms / 1_000)
+                )
 
                 current = AppState.model_validate((await client.get("/api/state")).json())
                 assert current.scene_analysis is not None
@@ -137,6 +151,22 @@ async def test_modeldeck_scene_analysis_latency_and_schema_acceptance(capsys):
             "mean": round(statistics.fmean(overhead_ms), 1),
             "median": round(statistics.median(overhead_ms), 1),
             "p95": round(_percentile(overhead_ms, 0.95), 1),
+        },
+        "tokens": {
+            "prompt_median": statistics.median(prompt_tokens),
+            "completion_median": statistics.median(completion_tokens),
+            "completion_minimum": min(completion_tokens),
+            "completion_maximum": max(completion_tokens),
+            "configured_completion_limit": completion_token_limits[0],
+            "completion_limit_hits": sum(
+                tokens >= limit
+                for tokens, limit in zip(
+                    completion_tokens, completion_token_limits, strict=True
+                )
+            ),
+            "observed_completion_tokens_per_second_median": round(
+                statistics.median(observed_completion_tokens_per_second), 2
+            ),
         },
     }
     with capsys.disabled():

@@ -12,6 +12,7 @@ def test_safe_defaults_do_not_store_frames():
     assert settings.scenechat_port == 3700
     assert settings.model_provider == "fallback"
     assert settings.model_fallback_mode == "replay"
+    assert settings.vision_max_tokens == 350
 
 
 @pytest.mark.parametrize("field", ["store_frames", "store_video"])
@@ -49,6 +50,12 @@ def test_modeldeck_gateway_is_allowed():
 def test_modeldeck_model_must_use_scenechat_vision_alias():
     with pytest.raises(ValidationError, match="scenechat-vision gateway alias"):
         Settings(modeldeck_model="text-diffusion")
+
+
+@pytest.mark.parametrize("value", [0, 127, 513])
+def test_vision_output_limit_has_safe_bounds(value):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, vision_max_tokens=value)
 
 
 def test_detector_model_options_are_an_explicit_allowlist():
