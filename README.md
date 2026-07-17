@@ -77,7 +77,7 @@ SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choi
 
 ```env
 DETECTOR_BACKEND=auto
-DETECTOR_MODEL=/path/to/models/yoloe-26s-seg.pt
+DETECTOR_MODEL=/path/to/models/yolov8s-worldv2.pt
 DETECTOR_MODEL_OPTIONS={"yoloe-26s":"/path/to/models/yoloe-26s-seg.pt","yoloworld-s":"/path/to/models/yolov8s-worldv2.pt"}
 DETECTOR_MAX_FPS=5
 DETECTOR_TEXT_ENCODER=/path/to/models/mobileclip2_b.ts
