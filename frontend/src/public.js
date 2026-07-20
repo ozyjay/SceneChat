@@ -116,6 +116,9 @@ function updatePromptPending() {
 
 function renderOperator(next) {
   $('modeValue').textContent = next.internal_mode;
+  if (document.activeElement !== $('modeSelect')) $('modeSelect').value = next.internal_mode;
+  if (document.activeElement !== $('providerSelect')) $('providerSelect').value = next.provider;
+  if (document.activeElement !== $('scenarioSelect')) $('scenarioSelect').value = next.replay_scenario;
   const cameraLabel = state.cameraLabels.get(String(next.camera_device)) || `Camera ${next.camera_device}`;
   $('cameraValue').textContent = next.camera_running ? `Running · ${cameraLabel}` : 'Stopped';
   $('fpsValue').textContent = next.camera_running ? `${next.detector_fps.toFixed(1)} FPS` : '—';
@@ -135,7 +138,11 @@ function renderOperator(next) {
   if (document.activeElement !== $('detectorPromptAutoUpdate')) {
     $('detectorPromptAutoUpdate').checked = next.detector_prompt_auto_update;
   }
-  $('providerValue').textContent = `${next.provider} · ${next.provider_available ? 'available' : 'unavailable'}`;
+  const providerName = next.provider === 'modeldeck' ? 'ModelDeck · scenechat-vision' : next.provider;
+  $('providerValue').textContent = `${providerName} · ${next.provider_available ? 'available' : 'unavailable'}`;
+  $('providerGuidance').textContent = next.provider === 'modeldeck'
+    ? next.provider_status_message
+    : `${providerName} is an explicit offline provider.`;
   $('latencyValue').textContent = next.last_model_latency_ms === null ? '—' : `${next.last_model_latency_ms.toFixed(0)} ms`;
   $('analysisValue').textContent = next.analysis_in_progress ? 'Running' : 'Idle';
   if (document.activeElement !== $('autoEnabled')) $('autoEnabled').checked = next.auto_analyse;
@@ -211,9 +218,12 @@ function render(next) {
     const item = document.createElement('li'); item.textContent = uncertainty; list.append(item);
   }
   document.querySelectorAll('.question-grid button').forEach((button) => {
-    button.disabled = next.analysis_in_progress || next.internal_mode === 'detector-only';
+    button.disabled = next.analysis_in_progress || next.internal_mode === 'detector-only' || next.privacy_screen;
     button.classList.toggle('active', button.dataset.question === next.selected_question);
   });
+  $('triggerAnalysis').disabled = next.analysis_in_progress
+    || next.internal_mode === 'detector-only'
+    || next.privacy_screen;
   renderOperator(next);
 }
 
@@ -235,7 +245,10 @@ async function act(action, success) {
 
 function populateOperatorControls(config, initial) {
   for (const mode of config.modes) $('modeSelect').add(new Option(mode, mode));
-  for (const provider of config.providers) $('providerSelect').add(new Option(provider, provider));
+  for (const provider of config.providers) {
+    const label = provider === 'modeldeck' ? 'ModelDeck · scenechat-vision' : provider;
+    $('providerSelect').add(new Option(label, provider));
+  }
   for (const scenario of config.scenarios) $('scenarioSelect').add(new Option(scenario.title, scenario.id));
   for (const question of config.questions) $('questionSelect').add(new Option(question, question));
   const detectorModels = config.detector_models || [];
@@ -294,9 +307,13 @@ function populateOperatorControls(config, initial) {
   $('detectorOnly').onclick = () => act(() => post('/api/mode', {mode: 'detector-only'}), 'Scene analysis disabled; camera fallback active.');
   $('applyMode').onclick = () => act(async () => {
     await post('/api/replay', {scenario: $('scenarioSelect').value});
-    await post('/api/mode', {mode: $('modeSelect').value});
-    return post('/api/provider', {provider: $('providerSelect').value});
+    await post('/api/provider', {provider: $('providerSelect').value});
+    return post('/api/mode', {mode: $('modeSelect').value});
   }, 'Mode and provider updated.');
+  $('checkProvider').onclick = () => act(
+    () => post('/api/provider/check'),
+    'Provider readiness checked.',
+  );
   $('startCamera').onclick = () => act(() => {
     const selected = document.querySelector('input[name="cameraDevice"]:checked');
     if (!selected) throw new Error('Choose a camera first.');

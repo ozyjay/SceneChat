@@ -1,13 +1,14 @@
 """Deterministic offline scene-analysis provider."""
 
 from scenechat.models import ObjectDescription, SceneAnalysis
+from scenechat.vision.base import AVAILABLE_STATUS, ProviderStatus
 
 
 class MockVisionProvider:
     name = "mock"
 
-    async def health(self) -> bool:
-        return True
+    async def health(self) -> ProviderStatus:
+        return AVAILABLE_STATUS
 
     async def analyse_scene(self, image: bytes, question: str) -> SceneAnalysis:
         summaries = {
@@ -54,4 +55,3 @@ class MockVisionProvider:
             uncertainties=["The exact purpose of small background items is unclear."],
             provider=self.name,
         )
-

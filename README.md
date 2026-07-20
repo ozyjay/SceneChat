@@ -11,10 +11,10 @@ Application modes are `development`, `live`, `detector-only`, `mock`, and `repla
 `MODEL_PROVIDER` is always explicit:
 
 - `modeldeck` sends live requests only through the ModelDeck gateway;
-- `replay` and `fallback` run without a live model (`MODEL_FALLBACK_MODE=replay`);
+- `replay` and `fallback` run without a live model;
 - `mock` is retained for deterministic development and tests.
 
-SceneChat never switches to another live provider automatically. A ModelDeck failure keeps the selected provider visible and degrades the app to camera/detector-only operation until staff explicitly choose a recovery or fallback.
+SceneChat never switches providers automatically. A ModelDeck failure keeps ModelDeck selected, retains the previous valid description, and degrades the app to camera/detector-only operation until staff explicitly recover or select an offline provider.
 
 ## Quick start
 
@@ -51,9 +51,11 @@ The scene panel clearly reports when analysis is ready, actively thinking, displ
 | SceneChat | Application, unified visitor/operator UX, API, health | `3700` |
 | ModelDeck | Management | `3600` |
 | ModelDeck | Model gateway used by SceneChat | `8600` |
-| ModelDeck | Managed model workers | `8610–8699` |
+| ModelDeck | Managed private Workers | ModelDeck-assigned; never configured in SceneChat |
 
-SceneChat binds only to `3700`. It sends model requests only to the dedicated `http://127.0.0.1:8600/v1/vision/analyse` gateway route using the `scenechat-vision` alias, and never calls or binds ModelDeck management or worker ports. SceneChat does not start or stop ModelDeck workers.
+SceneChat binds only to `3700`. It sends model requests only to the dedicated `http://127.0.0.1:8600/v1/vision/analyse` gateway route using the `scenechat-vision` alias and `scene-analysis-v1` contract. Readiness requires `image_input` and `structured_output`. SceneChat never calls ModelDeck management or Worker ports and cannot create, start, stop or replace Workers.
+
+The prepared Worker uses `google/gemma-4-E2B-it`, the SceneChat Gemma 4 trusted runtime, BF16, an 8,192-token context, a 512-token maximum output and an on-demand lifecycle. ModelDeck owns its model discovery, credentials, lifecycle and private routing. SceneChat has no Worker credential and performs no live model download.
 
 ## Configuration
 
@@ -65,11 +67,12 @@ SCENECHAT_PORT=3700
 
 MODEL_PROVIDER=modeldeck
 MODELDECK_URL=http://127.0.0.1:8600
-MODEL_FALLBACK_MODE=replay
+MODELDECK_MODEL=scenechat-vision
+VISION_REQUEST_TIMEOUT_SECONDS=20
 VISION_MAX_TOKENS=350
 ```
 
-Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or worker URLs are rejected at start-up. Storage of frames or video is also rejected by configuration.
+Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or Worker URLs are rejected at start-up. No ModelDeck secret is configured in SceneChat. Storage of frames or video is also rejected by configuration.
 
 `VISION_MAX_TOKENS` limits the scene-description response, including its structured JSON. The default of 350 is intended to keep public-demo responses concise; values from 128 to 512 are accepted so model quality and latency can be compared deliberately.
 
@@ -108,10 +111,20 @@ Do not promote a model backend to Open Day use until the hardware checks in [MOD
 - Use **Hide camera now** for an immediate privacy holding screen.
 - Use **Reset session** between visitors; it clears generated text and makes in-flight responses stale.
 
+## ModelDeck and SceneChat start-up
+
+1. In the ModelDeck repository, run its port and environment checks, then start it in Open Day mode with its PowerShell scripts.
+2. Open `http://127.0.0.1:3600`, start the prepared SceneChat Gemma 4 Worker, and wait for **ready**.
+3. From this repository, run `pwsh -NoProfile -File scripts/check_modeldeck.ps1`.
+4. Run `pwsh -NoProfile -File scripts/run.ps1`, open `http://127.0.0.1:3700/`, and use **Check provider readiness**.
+5. Start the camera, then apply `live` mode with `modeldeck`. If readiness fails, remain in camera-only mode or explicitly select replay/fallback.
+
+SceneChat start-up is deliberately non-fatal when ModelDeck is absent so offline operation remains available.
+
 ## Tests
 
 ```powershell
-& .venv/bin/python -m pytest
+& .venv/bin/python -m pytest -m "not hardware"
 ```
 
-No default automated test needs a physical camera, detector weights, network access, ModelDeck, or a large model.
+No ordinary automated test needs a physical camera, detector weights, network access, ModelDeck, or a large model. With the prepared Worker and SceneChat already running, `pwsh -NoProfile -File benchmarks/run.ps1` performs the opt-in prepared-image acceptance checks.

@@ -18,6 +18,8 @@ from scenechat.models import AppState, SceneAnalysis
 
 
 SCENECHAT_URL = "http://127.0.0.1:3700"
+MODELDECK_URL = "http://127.0.0.1:8600"
+MODEL_ALIAS = "scenechat-vision"
 REQUEST_TIMEOUT_SECONDS = 120.0
 WARMUP_REQUESTS = 2
 MEASURED_REQUESTS = 10
@@ -59,6 +61,23 @@ async def _assert_raster_prepared_frame(client: httpx.AsyncClient) -> None:
     )
 
 
+async def _assert_modeldeck_route_ready() -> None:
+    async with httpx.AsyncClient(base_url=MODELDECK_URL, timeout=3) as gateway:
+        models = (await gateway.get("/v1/models")).json().get("data", [])
+        route = next((item for item in models if item.get("id") == MODEL_ALIAS), None)
+        assert route is not None, "ModelDeck has not published scenechat-vision"
+        assert route.get("ready") is True, "start the SceneChat Worker in ModelDeck"
+
+        capabilities = (await gateway.get("/v1/capabilities")).json().get(
+            MODEL_ALIAS, {}
+        )
+        assert capabilities.get("image_input") is True
+        assert capabilities.get("structured_output") is True
+
+        routes = (await gateway.get("/v1/routes")).json()
+        assert routes.get("cloud_fallback") is False
+
+
 async def _request_analysis(
     client: httpx.AsyncClient, question: str
 ) -> tuple[float, SceneAnalysis, bool]:
@@ -78,6 +97,7 @@ async def _request_analysis(
 @pytest.mark.anyio
 async def test_modeldeck_scene_analysis_latency_and_schema_acceptance(capsys):
     """Measure ten sequential production-route requests using a prepared image."""
+    await _assert_modeldeck_route_ready()
     timeout = httpx.Timeout(REQUEST_TIMEOUT_SECONDS)
     async with httpx.AsyncClient(base_url=SCENECHAT_URL, timeout=timeout) as client:
         state_response = await client.get("/api/state")
@@ -133,7 +153,7 @@ async def test_modeldeck_scene_analysis_latency_and_schema_acceptance(capsys):
     result = {
         "route": f"{SCENECHAT_URL}/api/analyse",
         "provider": "modeldeck",
-        "model_alias": "scenechat-vision",
+        "model_alias": MODEL_ALIAS,
         "prepared_scenario": initial_state.replay_scenario,
         "warmup_requests": WARMUP_REQUESTS,
         "measured_requests": MEASURED_REQUESTS,
@@ -180,6 +200,7 @@ async def test_modeldeck_scene_analysis_latency_and_schema_acceptance(capsys):
 @pytest.mark.anyio
 async def test_reset_rejects_a_real_modeldeck_result_made_stale():
     """Reset during real inference and confirm its eventual result is not displayed."""
+    await _assert_modeldeck_route_ready()
     timeout = httpx.Timeout(REQUEST_TIMEOUT_SECONDS)
     async with httpx.AsyncClient(base_url=SCENECHAT_URL, timeout=timeout) as client:
         initial = AppState.model_validate((await client.get("/api/state")).json())

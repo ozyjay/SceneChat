@@ -3,7 +3,7 @@
 import asyncio
 
 from scenechat.services.state import StateStore
-from scenechat.vision.base import VisionLanguageProvider
+from scenechat.vision.base import VisionLanguageProvider, VisionProviderError
 
 
 class AnalysisBusy(RuntimeError):
@@ -32,7 +32,8 @@ class AnalysisService:
         async with self._lock:
             snapshot = await self.state.snapshot()
             generation = snapshot.generation
-            provider = self.providers[snapshot.provider]
+            provider_name = snapshot.provider
+            provider = self.providers[provider_name]
             await self.state.mutate(
                 lambda state: (
                     setattr(state, "analysis_in_progress", True),
@@ -49,10 +50,26 @@ class AnalysisService:
             except Exception as exc:
                 message = "Scene analysis is temporarily unavailable."
 
+                current = await self.state.snapshot()
+                if current.generation != generation or current.provider != provider_name:
+                    raise RuntimeError(message) from exc
+
+                if isinstance(exc, VisionProviderError):
+                    status_code = exc.code
+                    staff_message = exc.staff_message
+                elif isinstance(exc, TimeoutError):
+                    status_code = "timeout"
+                    staff_message = "The scene-analysis request timed out."
+                else:
+                    status_code = "provider_error"
+                    staff_message = message
+
                 def degrade(state):
                     state.analysis_in_progress = False
                     state.provider_available = False
-                    state.staff_error = message
+                    state.provider_status_code = status_code
+                    state.provider_status_message = staff_message
+                    state.staff_error = staff_message
                     if state.provider == "modeldeck":
                         state.internal_mode = "detector-only"
                         state.mode = (

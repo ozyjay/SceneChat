@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=8">
+  <link rel="stylesheet" href="/assets/styles.css?v=9">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -85,7 +85,8 @@
         <label>Application mode<select id="modeSelect"></select></label>
         <label>Scene provider<select id="providerSelect"></select></label>
         <label>Replay scenario<select id="scenarioSelect"></select></label>
-        <div class="button-row"><button id="applyMode" class="primary-button">Apply selections</button><button id="detectorOnly" class="secondary-button">Disable scene analysis</button></div>
+        <div class="button-row"><button id="applyMode" class="primary-button">Apply selections</button><button id="checkProvider" class="secondary-button">Check provider readiness</button><button id="detectorOnly" class="secondary-button">Disable scene analysis</button></div>
+        <p id="providerGuidance">ModelDeck Workers are started and managed in ModelDeck, not SceneChat.</p>
       </section>
 
       <section class="control-panel">
@@ -150,6 +151,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=8" defer></script>
+  <script src="/assets/public.js?v=9" defer></script>
 </body>
 </html>

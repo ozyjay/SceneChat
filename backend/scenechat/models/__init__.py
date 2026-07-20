@@ -6,6 +6,7 @@ from .schemas import (
     HealthStatus,
     ObjectDescription,
     SceneAnalysis,
+    SceneAnalysisPayload,
 )
 
 __all__ = [
@@ -14,5 +15,5 @@ __all__ = [
     "HealthStatus",
     "ObjectDescription",
     "SceneAnalysis",
+    "SceneAnalysisPayload",
 ]
-

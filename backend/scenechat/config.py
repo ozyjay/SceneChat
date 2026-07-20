@@ -12,6 +12,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 ROOT = Path(__file__).resolve().parents[2]
 SCENECHAT_PORT = 3700
 MODELDECK_GATEWAY_PORT = 8600
+MODELDECK_MODEL_ALIAS = "scenechat-vision"
+MODELDECK_PROTOCOL_CONTRACT = "scene-analysis-v1"
+MODELDECK_REQUIRED_CAPABILITIES = ("image_input", "structured_output")
 DEFAULT_DETECTOR_PROMPTS = [
     "person",
     "computer mouse",
@@ -68,9 +71,7 @@ class Settings(BaseSettings):
 
     model_provider: str = "fallback"
     modeldeck_url: str = "http://127.0.0.1:8600"
-    modeldeck_api_key: str = ""
-    modeldeck_model: str = "scenechat-vision"
-    model_fallback_mode: str = "replay"
+    modeldeck_model: str = MODELDECK_MODEL_ALIAS
     vision_request_timeout_seconds: float = Field(default=20, gt=0, le=120)
     vision_max_tokens: int = Field(default=350, ge=128, le=512)
     auto_analyse: bool = False
@@ -95,17 +96,10 @@ class Settings(BaseSettings):
             raise ValueError("must be modeldeck, replay, fallback, or mock")
         return value
 
-    @field_validator("model_fallback_mode")
-    @classmethod
-    def validate_fallback_mode(cls, value: str) -> str:
-        if value != "replay":
-            raise ValueError("must be replay")
-        return value
-
     @field_validator("modeldeck_model")
     @classmethod
     def validate_modeldeck_model(cls, value: str) -> str:
-        if value != "scenechat-vision":
+        if value != MODELDECK_MODEL_ALIAS:
             raise ValueError("must be the ModelDeck scenechat-vision gateway alias")
         return value
 

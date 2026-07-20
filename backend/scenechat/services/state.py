@@ -48,9 +48,15 @@ class StateStore:
             state.last_model_latency_ms = analysis.latency_ms
             state.analysis_in_progress = False
             state.provider_available = True
+            state.provider_status_code = "available"
+            state.provider_status_message = (
+                "ModelDeck scenechat-vision is ready with image_input and "
+                "structured_output."
+                if analysis.provider == "modeldeck"
+                else "Provider is available."
+            )
             state.staff_error = None
             applied = True
 
         await self.mutate(change)
         return applied
-

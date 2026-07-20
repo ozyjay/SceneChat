@@ -25,8 +25,8 @@
 ## Phase 3 — ModelDeck scene analysis
 
 **Goal:** use a multimodal model through the ModelDeck gateway without affecting detection.
-**Delivered foundation:** `ModelDeckProvider`, dedicated gateway vision routing, the pinned `scenechat-vision` alias, gateway-only URL validation, data-URL image input, structured response validation, prompt safeguards, one-request lock, timeout, timestamps, automatic interval, stale-result rejection, explicit replay fallback, and detector-only degradation.
-**Hardware gate:** exact gateway image request and combined-load measurements in `MODEL_COMPATIBILITY.md`. Concurrency, stale-result rejection, privacy blocking, automatic scheduling, and outage degradation have offline coverage. The physical ModelDeck gateway probe and two-hour camera-plus-model burn-in remain.
+**Delivered foundation:** `ModelDeckProvider`, dedicated gateway vision routing, the pinned `scenechat-vision` alias and `scene-analysis-v1` capability checks, gateway-only URL validation, JPEG/PNG data-URL input, strict structured response validation, prompt/output safeguards, one-request lock, timeout, automatic interval, generation-aware stale success/failure rejection, explicit replay fallback, and detector-only degradation without provider failover.
+**Hardware gate:** exact gateway image request and combined-load measurements in `MODEL_COMPATIBILITY.md`. Request shape, route/capability readiness, concurrency, reset/privacy invalidation, timeout, explicit fallback and outage degradation have offline coverage. The physical ModelDeck gateway probe and two-hour camera-plus-model burn-in remain.
 
 ## Phase 4 — Open Day interface
 
@@ -39,11 +39,11 @@
 
 **Goal:** production rehearsal and freeze.  
 **Delivered foundation:** one deterministic `.env`-driven launcher, privacy defaults, graceful resource release, and offline tests.
-**Remaining model-focused gate:** freeze the ModelDeck model/worker artefacts, run the physical camera-disconnect and gateway-outage drills, complete the 60-minute camera test and two-hour camera-plus-model burn-in, cold reboot, and staff rehearsal. The earlier direct-runtime outage drill does not substitute for the ModelDeck gateway drill.
+**Remaining model-focused gate:** freeze the prepared `google/gemma-4-E2B-it` trusted-runtime Worker fingerprint, run the physical camera-disconnect and gateway-outage drills, complete the 60-minute camera test and two-hour camera-plus-model burn-in, cold reboot, and staff rehearsal. The earlier direct-runtime outage drill does not substitute for the ModelDeck gateway drill.
 
 ## Risks and go/no-go rules
 
-- **Strix Halo worker kernels:** the current official Gemma 4 AMD recipe lists Instinct GPUs, not this integrated GPU. Treat the ModelDeck-managed worker support as unverified; keep replay and detector-only ready.
+- **Strix Halo runtime:** treat the prepared ModelDeck trusted-runtime Worker as unverified until the current physical acceptance and burn-in evidence is recorded; keep replay and detector-only ready.
 - **Unified-memory pressure:** use E2B first, restrict model context, record memory before and during combined use, and avoid concurrent analyses.
 - **Camera enumeration:** select named devices in operator controls and rehearse reconnect; camera failure must route to replay.
 - **Detector licence/performance:** deferred while the live model path uses no detector; reassess before re-enabling live object detection.

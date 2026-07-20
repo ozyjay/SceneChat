@@ -3,6 +3,7 @@
 from collections.abc import Mapping
 
 from scenechat.models import SceneAnalysis
+from scenechat.vision.base import AVAILABLE_STATUS, ProviderStatus
 
 
 class ReplayVisionProvider:
@@ -12,8 +13,10 @@ class ReplayVisionProvider:
         self._responses = dict(responses)
         self.name = name
 
-    async def health(self) -> bool:
-        return bool(self._responses)
+    async def health(self) -> ProviderStatus:
+        if self._responses:
+            return AVAILABLE_STATUS
+        return ProviderStatus(False, "replay_unavailable", "Replay data is unavailable.")
 
     async def analyse_scene(self, image: bytes, question: str) -> SceneAnalysis:
         response = self._responses.get(question) or self._responses.get("Describe the scene.")

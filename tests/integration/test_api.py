@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 import pytest
 
@@ -5,6 +7,8 @@ import scenechat.main as main_module
 from scenechat.config import Settings
 from scenechat.detection import NoopDetector
 from scenechat.main import create_app
+from scenechat.models import SceneAnalysis
+from scenechat.vision.base import ProviderStatus
 
 
 def _settings():
@@ -47,6 +51,8 @@ async def test_health_public_state_and_pages():
         assert 'id="analysisStatus"' in public.text
         assert 'id="analysisStatusTitle"' in public.text
         assert 'id="analysisStatusDetail"' in public.text
+        assert 'id="checkProvider"' in public.text
+        assert 'id="providerGuidance"' in public.text
         assert 'id="cameraDevice"' not in public.text
         staff = await client.get("/staff")
         assert staff.status_code == 307
@@ -104,6 +110,37 @@ async def test_privacy_screen_blocks_frame_and_can_be_restored():
 
 
 @pytest.mark.anyio
+async def test_privacy_screen_invalidates_an_in_flight_result():
+    class ControlledProvider:
+        def __init__(self):
+            self.started = asyncio.Event()
+            self.release = asyncio.Event()
+
+        async def analyse_scene(self, image, question):
+            self.started.set()
+            await self.release.wait()
+            return SceneAnalysis(summary="This result became private.", provider="replay")
+
+    async with AppClient() as client:
+        provider = ControlledProvider()
+        app = client._transport.app
+        app.state.providers["replay"] = provider
+        app.state.analysis.providers["replay"] = provider
+        request_task = asyncio.create_task(
+            client.post("/api/analyse", json={"question": "Describe the scene."})
+        )
+        await provider.started.wait()
+        privacy = await client.post("/api/privacy", json={"enabled": True})
+        provider.release.set()
+        response = await request_task
+
+        assert privacy.json()["privacy_screen"] is True
+        assert response.status_code == 200
+        assert response.json()["applied"] is False
+        assert (await client.get("/api/state")).json()["scene_analysis"] is None
+
+
+@pytest.mark.anyio
 async def test_detector_only_disables_analysis():
     async with AppClient() as client:
         assert (await client.post("/api/mode", json={"mode": "detector-only"})).status_code == 200
@@ -131,6 +168,11 @@ async def test_live_mode_without_detector_uses_accurate_public_wording():
         config = (await client.get("/api/config")).json()
         assert config["detector_enabled"] is False
         assert config["providers"] == ["modeldeck", "replay", "fallback", "mock"]
+        assert config["modeldeck_contract"] == {
+            "model": "scenechat-vision",
+            "protocol": "scene-analysis-v1",
+            "required_capabilities": ["image_input", "structured_output"],
+        }
         assert config["camera_devices"]
         assert all(camera["label"] for camera in config["camera_devices"])
         fallback = await client.post("/api/mode", json={"mode": "detector-only"})
@@ -156,6 +198,62 @@ async def test_fallback_provider_is_an_explicit_offline_selection():
         )
         assert response.status_code == 200
         assert response.json()["analysis"]["provider"] == "fallback"
+
+
+@pytest.mark.anyio
+async def test_provider_recheck_marks_modeldeck_unavailable_without_failover():
+    async with AppClient() as client:
+        app = client._transport.app
+
+        async def unavailable():
+            return ProviderStatus(
+                False,
+                "worker_not_ready",
+                "Start the SceneChat Worker in ModelDeck and wait for ready.",
+            )
+
+        app.state.providers["modeldeck"].health = unavailable
+        selected = await client.post("/api/provider", json={"provider": "modeldeck"})
+        checked = await client.post("/api/provider/check")
+
+        assert selected.status_code == 200
+        assert checked.json()["provider"] == "modeldeck"
+        assert checked.json()["provider_available"] is False
+        assert checked.json()["provider_status_code"] == "worker_not_ready"
+        assert checked.json()["internal_mode"] == "detector-only"
+        assert "Start the SceneChat Worker" in checked.json()["staff_error"]
+
+
+@pytest.mark.anyio
+async def test_modeldeck_unavailable_at_startup_keeps_offline_app_operational(monkeypatch):
+    async def unavailable(_provider):
+        return ProviderStatus(False, "gateway_unavailable", "ModelDeck is unavailable.")
+
+    monkeypatch.setattr(main_module.ModelDeckProvider, "health", unavailable)
+    settings = Settings(
+        _env_file=None,
+        scenechat_mode="live",
+        model_provider="modeldeck",
+        detector_backend="none",
+    )
+    app = create_app(settings)
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+    try:
+        state = (await client.get("/api/state")).json()
+        assert state["provider"] == "modeldeck"
+        assert state["provider_available"] is False
+        assert state["internal_mode"] == "detector-only"
+        assert state["mode"] == "Live camera only"
+        selected = await client.post("/api/provider", json={"provider": "replay"})
+        assert selected.json()["provider"] == "replay"
+        assert selected.json()["provider_available"] is True
+    finally:
+        await client.aclose()
+        await lifespan.__aexit__(None, None, None)
 
 
 @pytest.mark.anyio

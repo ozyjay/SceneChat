@@ -120,5 +120,6 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .diagnostics dt { color: var(--muted); font-size: .85rem; }
 .diagnostics dd { margin: .3rem 0 0; font-weight: 800; }
 .staff-error { margin-top: 1rem; padding: 1rem; border-left: 5px solid var(--danger); background: #541c2255; }
+#providerGuidance { color: var(--muted); line-height: 1.45; }
 @media (max-width: 1000px) { .public-grid { grid-template-columns: 1fr; } .question-grid { grid-template-columns: repeat(2, 1fr); } .explanation { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .topbar { padding: 1rem; align-items: flex-start; } .topbar-actions { align-items: stretch; flex-direction: column; } .mode-badge { font-size: .95rem; } .public-grid { padding: .5rem 1rem 1rem; } .questions, .operator-shell { margin: 0 1rem 1rem; } .question-grid, .operator-layout { grid-template-columns: 1fr; } .operator-shell > summary { grid-template-columns: 1fr; } .diagnostics { grid-template-columns: 1fr 1fr; } .camera-footer { flex-direction: column; } }

@@ -21,7 +21,13 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from scenechat import __version__
-from scenechat.config import ROOT, Settings, get_settings
+from scenechat.config import (
+    MODELDECK_PROTOCOL_CONTRACT,
+    MODELDECK_REQUIRED_CAPABILITIES,
+    ROOT,
+    Settings,
+    get_settings,
+)
 from scenechat.detection import create_detector
 from scenechat.models import AppState, Detection, HealthStatus
 from scenechat.replay import ReplayRegistry
@@ -30,6 +36,7 @@ from scenechat.services.camera import CameraService, CameraUnavailable, discover
 from scenechat.services.runtime import shutdown_requested
 from scenechat.services.state import StateStore
 from scenechat.vision import ModelDeckProvider, MockVisionProvider, ReplayVisionProvider
+from scenechat.vision.base import ProviderStatus
 
 
 FRONTEND = ROOT / "frontend"
@@ -146,6 +153,31 @@ async def _refresh_detector_prompts_from_analysis(
         return
 
 
+def _degrade_modeldeck_state(state: AppState, detector_backend: str) -> None:
+    state.internal_mode = "detector-only"
+    state.mode = "Live camera only" if detector_backend == "none" else "Detector only"
+
+
+def _apply_provider_status(
+    state: AppState,
+    provider_name: str,
+    status: ProviderStatus,
+    detector_backend: str,
+    *,
+    invalidate: bool,
+) -> None:
+    if invalidate:
+        state.generation += 1
+        state.analysis_in_progress = False
+    state.provider = provider_name
+    state.provider_available = status.available
+    state.provider_status_code = status.code
+    state.provider_status_message = status.message
+    state.staff_error = None if status.available else status.message
+    if provider_name == "modeldeck" and not status.available:
+        _degrade_modeldeck_state(state, detector_backend)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     configured = settings or get_settings()
 
@@ -153,14 +185,37 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         registry = ReplayRegistry()
         scenario = registry.get(configured.replay_scenario)
-        initial_provider = (
-            "replay" if configured.scenechat_mode == "replay" else configured.model_provider
+        initial_provider = {
+            "mock": "mock",
+            "replay": "replay",
+        }.get(configured.scenechat_mode, configured.model_provider)
+        modeldeck = ModelDeckProvider(
+            configured.modeldeck_url,
+            configured.modeldeck_model,
+            configured.vision_request_timeout_seconds,
+            configured.vision_max_tokens,
         )
+        providers = {
+            "modeldeck": modeldeck,
+            "mock": MockVisionProvider(),
+            "replay": ReplayVisionProvider(scenario.responses),
+            "fallback": ReplayVisionProvider(scenario.responses, name="fallback"),
+        }
+        initial_status = await providers[initial_provider].health()
+        initial_mode = configured.scenechat_mode
+        initial_public_mode = _public_mode(initial_mode, configured.detector_backend)
+        if initial_provider == "modeldeck" and not initial_status.available:
+            initial_mode = "detector-only"
+            initial_public_mode = _public_mode(initial_mode, configured.detector_backend)
         state = StateStore(
             AppState(
-                mode=_public_mode(configured.scenechat_mode, configured.detector_backend),
-                internal_mode=configured.scenechat_mode,
+                mode=initial_public_mode,
+                internal_mode=initial_mode,
                 provider=initial_provider,
+                provider_available=initial_status.available,
+                provider_status_code=initial_status.code,
+                provider_status_message=initial_status.message,
+                staff_error=None if initial_status.available else initial_status.message,
                 camera_device=configured.camera_device,
                 detector_backend=configured.detector_backend,
                 detector_model=configured.detector_model_id(),
@@ -176,7 +231,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ),
                 replay_scenario=scenario.id,
                 detections=_detections_for_mode(
-                    configured.scenechat_mode,
+                    initial_mode,
                     configured.detector_backend,
                     scenario.detections,
                 ),
@@ -184,19 +239,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 auto_analyse_interval_seconds=configured.auto_analyse_interval_seconds,
             )
         )
-        modeldeck = ModelDeckProvider(
-            configured.modeldeck_url,
-            configured.modeldeck_api_key,
-            configured.modeldeck_model,
-            configured.vision_request_timeout_seconds,
-            configured.vision_max_tokens,
-        )
-        providers = {
-            "modeldeck": modeldeck,
-            "mock": MockVisionProvider(),
-            "replay": ReplayVisionProvider(scenario.responses),
-            "fallback": ReplayVisionProvider(scenario.responses, name="fallback"),
-        }
         detector = create_detector(configured)
         camera = CameraService(configured, detector, state)
         analysis = AnalysisService(
@@ -277,6 +319,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "questions": _load_questions(),
             "modes": ["development", "live", "detector-only", "mock", "replay"],
             "providers": ["modeldeck", "replay", "fallback", "mock"],
+            "modeldeck_contract": {
+                "model": configured.modeldeck_model,
+                "protocol": MODELDECK_PROTOCOL_CONTRACT,
+                "required_capabilities": list(MODELDECK_REQUIRED_CAPABILITIES),
+            },
             "detector_enabled": configured.detector_backend != "none",
             "detector_models": (
                 [
@@ -401,9 +448,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         request: Request,
         enabled: Annotated[bool, Body(embed=True)],
     ):
-        return await request.app.state.state_store.mutate(
-            lambda state: setattr(state, "privacy_screen", enabled)
-        )
+        def change(state):
+            if enabled and not state.privacy_screen:
+                state.generation += 1
+                state.analysis_in_progress = False
+            state.privacy_screen = enabled
+
+        return await request.app.state.state_store.mutate(change)
 
     @app.post("/api/mode", response_model=AppState)
     async def mode(payload: ModeRequest, request: Request):
@@ -413,6 +464,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         scenario = request.app.state.registry.get(current.replay_scenario)
 
         def change(state):
+            state.generation += 1
+            state.analysis_in_progress = False
             state.internal_mode = payload.mode
             state.mode = _public_mode(payload.mode, configured.detector_backend)
             state.detections = _detections_for_mode(
@@ -423,8 +476,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             state.staff_error = None
             if payload.mode == "mock":
                 state.provider = "mock"
+                state.provider_available = True
+                state.provider_status_code = "available"
+                state.provider_status_message = "Provider is available."
             elif payload.mode == "replay":
                 state.provider = "replay"
+                state.provider_available = True
+                state.provider_status_code = "available"
+                state.provider_status_message = "Provider is available."
+            elif state.provider == "modeldeck" and not state.provider_available:
+                _degrade_modeldeck_state(state, configured.detector_backend)
+                state.staff_error = state.provider_status_message
 
         return await request.app.state.state_store.mutate(change)
 
@@ -432,13 +494,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def provider(payload: ProviderRequest, request: Request):
         if payload.provider not in request.app.state.providers:
             raise HTTPException(400, "Unsupported provider")
-        available = await request.app.state.providers[payload.provider].health()
+        status = await request.app.state.providers[payload.provider].health()
         return await request.app.state.state_store.mutate(
-            lambda state: (
-                setattr(state, "provider", payload.provider),
-                setattr(state, "provider_available", available),
-                setattr(state, "staff_error", None if available else "Provider is unavailable."),
+            lambda state: _apply_provider_status(
+                state,
+                payload.provider,
+                status,
+                configured.detector_backend,
+                invalidate=True,
             )
+        )
+
+    @app.post("/api/provider/check", response_model=AppState)
+    async def check_provider(request: Request):
+        current = await request.app.state.state_store.snapshot()
+        status = await request.app.state.providers[current.provider].health()
+
+        def apply_if_still_selected(state):
+            if state.provider != current.provider:
+                return
+            _apply_provider_status(
+                state,
+                current.provider,
+                status,
+                configured.detector_backend,
+                invalidate=not status.available and state.analysis_in_progress,
+            )
+
+        return await request.app.state.state_store.mutate(
+            apply_if_still_selected
         )
 
     @app.post("/api/camera/start", response_model=AppState)
@@ -560,6 +644,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             )
             state.scene_analysis = None
             state.generation += 1
+            state.analysis_in_progress = False
 
         return await request.app.state.state_store.mutate(change)
 

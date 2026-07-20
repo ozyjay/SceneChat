@@ -11,7 +11,6 @@ def test_safe_defaults_do_not_store_frames():
     assert settings.scenechat_host == "127.0.0.1"
     assert settings.scenechat_port == 3700
     assert settings.model_provider == "fallback"
-    assert settings.model_fallback_mode == "replay"
     assert settings.vision_max_tokens == 350
 
 

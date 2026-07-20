@@ -1,8 +1,9 @@
 """Pydantic schemas shared by services and API routes."""
 
 from datetime import datetime, timezone
+from typing import Annotated
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 def utc_now() -> datetime:
@@ -36,17 +37,29 @@ class Detection(BaseModel):
 
 
 class ObjectDescription(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     label: str = Field(min_length=1, max_length=80)
     description: str = Field(min_length=1, max_length=300)
     approximate_location: str = Field(min_length=1, max_length=80)
 
 
-class SceneAnalysis(BaseModel):
+PublicListItem = Annotated[str, Field(min_length=1, max_length=300)]
+
+
+class SceneAnalysisPayload(BaseModel):
+    """Strict model-generated fields accepted before trusted metadata is added."""
+
+    model_config = ConfigDict(extra="forbid")
+
     summary: str = Field(min_length=1, max_length=800)
     objects: list[ObjectDescription] = Field(default_factory=list, max_length=30)
-    relationships: list[str] = Field(default_factory=list, max_length=20)
-    uncertainties: list[str] = Field(default_factory=list, max_length=20)
-    safety_notes: list[str] = Field(default_factory=list, max_length=10)
+    relationships: list[PublicListItem] = Field(default_factory=list, max_length=20)
+    uncertainties: list[PublicListItem] = Field(default_factory=list, max_length=20)
+    safety_notes: list[PublicListItem] = Field(default_factory=list, max_length=10)
+
+
+class SceneAnalysis(SceneAnalysisPayload):
     generated_at: datetime = Field(default_factory=utc_now)
     provider: str = Field(default="unknown", max_length=40)
     latency_ms: float | None = Field(default=None, ge=0)
@@ -62,6 +75,8 @@ class AppState(BaseModel):
     internal_mode: str = "development"
     provider: str = "mock"
     provider_available: bool = True
+    provider_status_code: str = "available"
+    provider_status_message: str = "Provider is available."
     privacy_screen: bool = False
     camera_running: bool = False
     camera_device: int = 0

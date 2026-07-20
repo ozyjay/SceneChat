@@ -38,3 +38,27 @@ def test_parses_one_markdown_fence():
 def test_invalid_output_has_safe_error(raw):
     with pytest.raises(VisionProviderError, match="invalid structured response"):
         parse_scene_analysis(raw, "modeldeck")
+
+
+def test_rejects_extra_operational_fields_and_unbounded_list_text():
+    extra = valid_payload() | {"latency_ms": 1}
+    with pytest.raises(VisionProviderError, match="invalid structured response"):
+        parse_scene_analysis(json.dumps(extra), "modeldeck")
+
+    too_long = valid_payload() | {"relationships": ["x" * 301]}
+    with pytest.raises(VisionProviderError, match="invalid structured response"):
+        parse_scene_analysis(json.dumps(too_long), "modeldeck")
+
+
+@pytest.mark.parametrize(
+    "summary",
+    [
+        "Her name is Alice.",
+        "A 14-year-old person is visible.",
+        "The person's religion is apparent.",
+    ],
+)
+def test_rejects_prohibited_identification_and_sensitive_claims(summary):
+    payload = valid_payload() | {"summary": summary}
+    with pytest.raises(VisionProviderError, match="unsafe to display"):
+        parse_scene_analysis(json.dumps(payload), "modeldeck")

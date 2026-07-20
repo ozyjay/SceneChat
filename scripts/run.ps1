@@ -8,9 +8,25 @@ if (-not (Test-Path -PathType Leaf .env)) {
     throw 'Missing .env. Run scripts/setup.ps1 first.'
 }
 
+$EnvironmentLines = Get-Content .env
+$ModelDeckSelected = [bool]($EnvironmentLines | Where-Object { $_ -eq 'MODEL_PROVIDER=modeldeck' })
+if ($ModelDeckSelected) {
+    $ModelDeckUrl = 'http://127.0.0.1:8600'
+    $ModelDeckModel = 'scenechat-vision'
+    $ModelDeckUrlLine = $EnvironmentLines | Where-Object { $_ -like 'MODELDECK_URL=*' } | Select-Object -First 1
+    $ModelDeckModelLine = $EnvironmentLines | Where-Object { $_ -like 'MODELDECK_MODEL=*' } | Select-Object -First 1
+    if ($ModelDeckUrlLine) { $ModelDeckUrl = ($ModelDeckUrlLine -split '=', 2)[1] }
+    if ($ModelDeckModelLine) { $ModelDeckModel = ($ModelDeckModelLine -split '=', 2)[1] }
+    try {
+        & (Join-Path $PSScriptRoot 'check_modeldeck.ps1') -GatewayUrl $ModelDeckUrl -ModelAlias $ModelDeckModel
+    } catch {
+        Write-Warning "$($_.Exception.Message) SceneChat will still start for camera-only, replay or mock operation."
+    }
+}
+
 # The project .env is authoritative. Clear inherited values for its keys so a
 # previous launcher or shell session cannot silently override the configuration.
-Get-Content .env | ForEach-Object {
+$EnvironmentLines | ForEach-Object {
     if ($_ -match '^([A-Z][A-Z0-9_]*)=') {
         Remove-Item "Env:$($Matches[1])" -ErrorAction SilentlyContinue
     }
