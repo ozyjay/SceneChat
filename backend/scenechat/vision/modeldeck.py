@@ -25,7 +25,7 @@ class ModelDeckProvider:
         gateway_url: str,
         model: str,
         timeout: float,
-        max_tokens: int = 350,
+        max_tokens: int = 512,
         health_timeout: float = 2.0,
         *,
         transport: httpx.AsyncBaseTransport | None = None,

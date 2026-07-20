@@ -69,12 +69,12 @@ MODEL_PROVIDER=modeldeck
 MODELDECK_URL=http://127.0.0.1:8600
 MODELDECK_MODEL=scenechat-vision
 VISION_REQUEST_TIMEOUT_SECONDS=20
-VISION_MAX_TOKENS=350
+VISION_MAX_TOKENS=512
 ```
 
 Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or Worker URLs are rejected at start-up. No ModelDeck secret is configured in SceneChat. Storage of frames or video is also rejected by configuration.
 
-`VISION_MAX_TOKENS` limits the scene-description response, including its structured JSON. The default of 350 is intended to keep public-demo responses concise; values from 128 to 512 are accepted so model quality and latency can be compared deliberately.
+`VISION_MAX_TOKENS` limits the complete structured scene-description response. The default is 512, matching the prepared Worker's maximum; lower values down to 128 remain valid for deliberate latency experiments, but can truncate the JSON response.
 
 SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
 

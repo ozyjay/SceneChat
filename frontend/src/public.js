@@ -206,10 +206,11 @@ function render(next) {
   renderCounts(next.privacy_screen ? [] : next.detections);
   const analysis = next.scene_analysis;
   renderAnalysisStatus(next, analysis);
-  $('sceneSummary').textContent = analysis?.summary || 'Choose a question to generate a scene description.';
+  $('sceneSummary').textContent = analysis?.summary
+    || (next.analysis_in_progress ? 'Analysing the scene…' : 'Choose a question to generate a scene description.');
   $('analysisTime').textContent = analysis
     ? `Description updated ${new Date(analysis.generated_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'})}`
-    : 'No scene description yet';
+    : (next.analysis_in_progress ? 'Scene analysis in progress' : 'No scene description yet');
   const uncertaintyPanel = $('uncertaintyPanel');
   const list = $('uncertainties');
   list.replaceChildren();
