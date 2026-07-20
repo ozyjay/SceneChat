@@ -168,8 +168,8 @@ function renderAnalysisStatus(next, analysis) {
     status.className = 'analysis-status thinking';
     title.textContent = 'Analysing the scene…';
     detail.textContent = analysis
-      ? `Thinking about “${next.selected_question}”. The previous description remains visible below.`
-      : `Thinking about “${next.selected_question}”.`;
+      ? `Question: ${next.selected_question} The previous description remains visible below.`
+      : `Question: ${next.selected_question}`;
     return;
   }
   if (next.internal_mode === 'detector-only') {
