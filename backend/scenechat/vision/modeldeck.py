@@ -1,9 +1,13 @@
 """ModelDeck gateway adapter for dedicated SceneChat vision requests."""
 
 import base64
+import logging
 import time
+from dataclasses import dataclass
 
+import cv2
 import httpx
+import numpy as np
 
 from scenechat.config import MODELDECK_REQUIRED_CAPABILITIES
 from scenechat.models import SceneAnalysis
@@ -13,6 +17,89 @@ from scenechat.vision.base import (
     build_prompt,
     parse_scene_analysis,
 )
+
+
+ANALYSIS_JPEG_QUALITY = 82
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class PreparedAnalysisImage:
+    jpeg: bytes
+    original_width: int
+    original_height: int
+    transmitted_width: int
+    transmitted_height: int
+    resize_ms: float
+
+
+def analysis_dimensions(width: int, height: int, max_edge: int) -> tuple[int, int]:
+    """Return aspect-ratio-preserving dimensions bounded by ``max_edge``."""
+    if max_edge == 0 or (width <= max_edge and height <= max_edge):
+        return width, height
+    if width >= height:
+        return max_edge, max(1, round(height * max_edge / width))
+    return max(1, round(width * max_edge / height)), max_edge
+
+
+def prepare_analysis_image(image: bytes, max_edge: int) -> PreparedAnalysisImage:
+    """Decode, optionally downscale, and JPEG-encode an in-memory request copy."""
+    supported_signatures = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
+    if not image.startswith(supported_signatures):
+        raise VisionProviderError(
+            "The selected frame is not a supported JPEG or PNG image.",
+            code="unsupported_image",
+        )
+
+    try:
+        decoded = cv2.imdecode(np.frombuffer(image, dtype=np.uint8), cv2.IMREAD_COLOR)
+    except cv2.error as exc:
+        raise VisionProviderError(
+            "The selected JPEG or PNG image could not be decoded.",
+            code="invalid_image",
+        ) from exc
+    if decoded is None:
+        raise VisionProviderError(
+            "The selected JPEG or PNG image could not be decoded.",
+            code="invalid_image",
+        )
+
+    original_height, original_width = decoded.shape[:2]
+    transmitted_width, transmitted_height = analysis_dimensions(
+        original_width, original_height, max_edge
+    )
+    resize_ms = 0.0
+    if (transmitted_width, transmitted_height) != (original_width, original_height):
+        resize_started = time.perf_counter()
+        decoded = cv2.resize(
+            decoded,
+            (transmitted_width, transmitted_height),
+            interpolation=cv2.INTER_AREA,
+        )
+        resize_ms = round((time.perf_counter() - resize_started) * 1000, 1)
+    try:
+        encoded_ok, encoded = cv2.imencode(
+            ".jpg", decoded, [cv2.IMWRITE_JPEG_QUALITY, ANALYSIS_JPEG_QUALITY]
+        )
+    except cv2.error as exc:
+        raise VisionProviderError(
+            "The analysis image could not be encoded as JPEG.",
+            code="image_encode_failed",
+        ) from exc
+    if not encoded_ok:
+        raise VisionProviderError(
+            "The analysis image could not be encoded as JPEG.",
+            code="image_encode_failed",
+        )
+
+    return PreparedAnalysisImage(
+        jpeg=encoded.tobytes(),
+        original_width=original_width,
+        original_height=original_height,
+        transmitted_width=transmitted_width,
+        transmitted_height=transmitted_height,
+        resize_ms=resize_ms,
+    )
 
 
 class ModelDeckProvider:
@@ -28,11 +115,13 @@ class ModelDeckProvider:
         max_tokens: int = 512,
         health_timeout: float = 2.0,
         *,
+        analysis_max_edge: int = 0,
         transport: httpx.AsyncBaseTransport | None = None,
     ):
         self.gateway_url = gateway_url.rstrip("/")
         self.model = model
         self.max_tokens = max_tokens
+        self.analysis_max_edge = analysis_max_edge
         self.health_timeout = health_timeout
         self._client = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout, connect=min(timeout, 2.0)), transport=transport
@@ -116,17 +205,9 @@ class ModelDeckProvider:
             )
 
     async def analyse_scene(self, image: bytes, question: str) -> SceneAnalysis:
-        if image.startswith(b"\x89PNG\r\n\x1a\n"):
-            media_type = "image/png"
-        elif image.startswith(b"\xff\xd8\xff"):
-            media_type = "image/jpeg"
-        else:
-            raise VisionProviderError(
-                "The selected frame is not a supported JPEG or PNG image.",
-                code="unsupported_image",
-            )
-        encoded = base64.b64encode(image).decode("ascii")
         started = time.perf_counter()
+        prepared = prepare_analysis_image(image, self.analysis_max_edge)
+        encoded = base64.b64encode(prepared.jpeg).decode("ascii")
         payload = {
             "model": self.model,
             "messages": [
@@ -135,7 +216,7 @@ class ModelDeckProvider:
                     "content": [
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:{media_type};base64,{encoded}"},
+                            "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
                         },
                         {"type": "text", "text": build_prompt(question)},
                     ],
@@ -146,6 +227,7 @@ class ModelDeckProvider:
             "response_format": {"type": "json_object"},
             "stream": False,
         }
+        outcome = "cancelled"
         try:
             response = await self._client.post(
                 f"{self.gateway_url}/v1/vision/analyse", json=payload
@@ -185,33 +267,55 @@ class ModelDeckProvider:
                     usage.get("completion_tokens")
                 )
             analysis.completion_token_limit = self.max_tokens
+            outcome = "success"
             return analysis
         except VisionProviderError:
+            outcome = "provider_error"
             raise
         except httpx.TimeoutException as exc:
+            outcome = "timeout"
             raise VisionProviderError(
                 "Scene analysis timed out.",
                 code="timeout",
                 staff_message="The ModelDeck scene-analysis request timed out.",
             ) from exc
         except httpx.HTTPStatusError as exc:
+            outcome = "gateway_error"
             raise VisionProviderError(
                 "Scene analysis is temporarily unavailable.",
                 code="gateway_error",
                 staff_message="The ModelDeck gateway rejected the scene-analysis request.",
             ) from exc
         except httpx.HTTPError as exc:
+            outcome = "gateway_unavailable"
             raise VisionProviderError(
                 "Scene analysis is temporarily unavailable.",
                 code="gateway_unavailable",
                 staff_message="The ModelDeck gateway is unavailable on port 8600.",
             ) from exc
         except (KeyError, IndexError, TypeError, ValueError) as exc:
+            outcome = "invalid_response"
             raise VisionProviderError(
                 "The model returned an invalid structured response.",
                 code="invalid_response",
                 staff_message="ModelDeck returned an invalid scene-analysis response.",
             ) from exc
+        finally:
+            logger.info(
+                "ModelDeck scene analysis outcome=%s original_width=%d "
+                "original_height=%d original_bytes=%d transmitted_width=%d "
+                "transmitted_height=%d transmitted_bytes=%d resize_ms=%.1f "
+                "provider_latency_ms=%.1f",
+                outcome,
+                prepared.original_width,
+                prepared.original_height,
+                len(image),
+                prepared.transmitted_width,
+                prepared.transmitted_height,
+                len(prepared.jpeg),
+                prepared.resize_ms,
+                (time.perf_counter() - started) * 1000,
+            )
 
 
 def _non_negative_int(value: object) -> int | None:

@@ -193,7 +193,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             configured.modeldeck_url,
             configured.modeldeck_model,
             configured.vision_request_timeout_seconds,
-            configured.vision_max_tokens,
+            max_tokens=configured.vision_max_tokens,
+            analysis_max_edge=configured.vision_analysis_max_edge,
         )
         providers = {
             "modeldeck": modeldeck,

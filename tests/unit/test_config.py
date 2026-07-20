@@ -11,6 +11,7 @@ def test_safe_defaults_do_not_store_frames():
     assert settings.scenechat_host == "127.0.0.1"
     assert settings.scenechat_port == 3700
     assert settings.model_provider == "fallback"
+    assert settings.vision_analysis_max_edge == 0
     assert settings.vision_max_tokens == 512
 
 
@@ -55,6 +56,19 @@ def test_modeldeck_model_must_use_scenechat_vision_alias():
 def test_vision_output_limit_has_safe_bounds(value):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, vision_max_tokens=value)
+
+
+@pytest.mark.parametrize("value", [1, 255, 1281, 4096])
+def test_vision_analysis_max_edge_has_safe_bounds(value):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, vision_analysis_max_edge=value)
+
+
+@pytest.mark.parametrize("value", [0, 256, 512, 1280])
+def test_vision_analysis_max_edge_accepts_bounded_values(value):
+    settings = Settings(_env_file=None, vision_analysis_max_edge=value)
+
+    assert settings.vision_analysis_max_edge == value
 
 
 def test_detector_model_options_are_an_explicit_allowlist():

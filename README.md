@@ -69,12 +69,17 @@ MODEL_PROVIDER=modeldeck
 MODELDECK_URL=http://127.0.0.1:8600
 MODELDECK_MODEL=scenechat-vision
 VISION_REQUEST_TIMEOUT_SECONDS=20
+VISION_ANALYSIS_MAX_EDGE=0
 VISION_MAX_TOKENS=512
 ```
 
 Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or Worker URLs are rejected at start-up. No ModelDeck secret is configured in SceneChat. Storage of frames or video is also rejected by configuration.
 
 `VISION_MAX_TOKENS` limits the complete structured scene-description response. The default is 512, matching the prepared Worker's maximum; lower values down to 128 remain valid for deliberate latency experiments, but can truncate the JSON response.
+
+`VISION_ANALYSIS_MAX_EDGE` is an optional transport and experimentation control for only the in-memory image copy sent to ModelDeck. The default `0` disables manual resizing; experimental limits from 256 to 1280 pixels are accepted. A value of 512 converts a 1280×720 frame to 512×288 and a 720×1280 frame to 288×512 without cropping, padding, stretching or upscaling. SceneChat uses OpenCV `INTER_AREA` interpolation when shrinking and re-encodes the request copy as JPEG at quality 82. The original camera frame remains unchanged for browser display and object detection, and neither copy is written to disk.
+
+Image dimensions, encoded byte counts, resize duration, total provider latency and the request outcome are logged for successful and timed-out ModelDeck analysis requests. These diagnostics never include image or base64 data, prompts, or visitor-derived descriptions. Pixel resizing primarily changes transport size and does not imply an inference-latency improvement: ModelDeck's trusted Worker owns Gemma 4's native processor configuration and currently uses `max_soft_tokens=280`, `patch_size=16` and `pooling_kernel_size=3`. SceneChat sends no visual-token setting. A separate ModelDeck experiment may compare allowlisted native budgets of 70, 140, 280, 560 or 1120; 140 and 280 are the recommended starting comparison.
 
 SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
 

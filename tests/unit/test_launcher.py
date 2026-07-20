@@ -25,13 +25,31 @@ def test_launcher_suppresses_routine_server_logs(monkeypatch):
 
     launcher.main()
 
-    assert captured["server_config"] == {
+    server_config = captured["server_config"]
+    assert {
+        key: server_config[key]
+        for key in [
+            "application",
+            "host",
+            "port",
+            "reload",
+            "access_log",
+            "log_level",
+        ]
+    } == {
         "application": "scenechat.main:app",
         "host": "127.0.0.1",
         "port": 3700,
         "reload": False,
         "access_log": False,
         "log_level": "warning",
+    }
+    assert server_config["log_config"]["loggers"][
+        "scenechat.vision.modeldeck"
+    ] == {
+        "handlers": ["default"],
+        "level": "INFO",
+        "propagate": False,
     }
     assert captured["run"] is True
 

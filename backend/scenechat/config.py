@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     modeldeck_url: str = "http://127.0.0.1:8600"
     modeldeck_model: str = MODELDECK_MODEL_ALIAS
     vision_request_timeout_seconds: float = Field(default=20, gt=0, le=120)
+    vision_analysis_max_edge: int = Field(default=0, ge=0, le=1280)
     vision_max_tokens: int = Field(default=512, ge=128, le=512)
     auto_analyse: bool = False
     auto_analyse_interval_seconds: float = Field(default=5, ge=3, le=60)
@@ -101,6 +102,13 @@ class Settings(BaseSettings):
     def validate_modeldeck_model(cls, value: str) -> str:
         if value != MODELDECK_MODEL_ALIAS:
             raise ValueError("must be the ModelDeck scenechat-vision gateway alias")
+        return value
+
+    @field_validator("vision_analysis_max_edge")
+    @classmethod
+    def validate_vision_analysis_max_edge(cls, value: int) -> int:
+        if value != 0 and value < 256:
+            raise ValueError("must be 0 (disabled) or between 256 and 1280")
         return value
 
     @field_validator("detector_backend")
