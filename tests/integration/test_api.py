@@ -44,7 +44,10 @@ async def test_health_public_state_and_pages():
         assert public.status_code == 200
         assert '<dialog id="operator-controls"' in public.text
         assert 'id="closeOperatorControls"' in public.text
-        assert 'id="operatorToast"' in public.text
+        assert '<button id="operatorToast"' in public.text
+        assert public.text.index(
+            'class="control-panel camera-panel"'
+        ) < public.text.index('class="control-panel emergency-panel"')
         assert 'class="operator-shell"' not in public.text
         assert 'id="cameraChoices"' in public.text
         assert 'id="detectorModelSelect"' in public.text
@@ -55,8 +58,8 @@ async def test_health_public_state_and_pages():
         assert 'id="autoQuestionChoices"' in public.text
         assert 'id="autoScheduleStatus"' in public.text
         assert 'id="headerPrivacy"' in public.text
-        assert '/assets/styles.css?v=14' in public.text
-        assert '/assets/public.js?v=18' in public.text
+        assert '/assets/styles.css?v=15' in public.text
+        assert '/assets/public.js?v=19' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="learnedPromptChips"' in public.text
         assert 'id="clearLearnedPrompts"' in public.text
@@ -80,12 +83,13 @@ async def test_health_public_state_and_pages():
         assert health.json()["status"] == "ok"
         assert (await client.get("/api/diagnostics")).status_code == 200
         assert (await client.get("/api/frame")).status_code == 200
-        script = await client.get("/assets/public.js?v=18")
+        script = await client.get("/assets/public.js?v=19")
         assert "Automatic scene analysis enabled" in script.text
         assert "Automatic analysis paused" in script.text
         assert "Automatic scene analysis is paused until the camera starts again" in script.text
         assert "Object detection updated" in script.text
         assert "Privacy screen activated" in script.text
+        assert "dismissNotifications" in script.text
 
 
 @pytest.mark.anyio

@@ -22,6 +22,12 @@ const promptLearningReasonLabels = {
 };
 const $ = (id) => document.getElementById(id);
 
+function dismissNotifications() {
+  $('operatorToast').classList.remove('show');
+  $('toast').classList.remove('show');
+  window.clearTimeout(state.toastTimer);
+}
+
 function showToast(message) {
   const operatorToast = $('operatorToast');
   const publicToast = $('toast');
@@ -31,7 +37,7 @@ function showToast(message) {
   toast.textContent = message;
   toast.classList.add('show');
   window.clearTimeout(state.toastTimer);
-  state.toastTimer = window.setTimeout(() => toast.classList.remove('show'), 5500);
+  state.toastTimer = window.setTimeout(dismissNotifications, 5500);
 }
 
 function formatErrorDetail(detail) {
@@ -645,6 +651,8 @@ async function initialise() {
   state.questions = config.questions;
   state.detectorEnabled = config.detector_enabled;
   state.current = initial;
+  $('operatorToast').onclick = dismissNotifications;
+  $('toast').onclick = dismissNotifications;
   const buttons = $('questionButtons');
   for (const question of config.questions) {
     const button = document.createElement('button');

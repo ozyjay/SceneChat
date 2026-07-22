@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=14">
+  <link rel="stylesheet" href="/assets/styles.css?v=15">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -81,7 +81,6 @@
   </section>
 
   <dialog id="operator-controls" class="operator-dialog" aria-labelledby="operatorControlsTitle">
-    <div id="operatorToast" class="toast operator-toast" role="status" aria-live="polite"></div>
     <div class="operator-dialog-header">
       <div>
         <p class="panel-kicker">Staff interface</p>
@@ -90,7 +89,19 @@
       </div>
       <button id="closeOperatorControls" class="secondary-button">Close</button>
     </div>
+    <button id="operatorToast" class="toast operator-toast" type="button" aria-live="polite" aria-label="Dismiss notification"></button>
     <div class="operator-layout">
+      <section class="control-panel camera-panel">
+        <p class="panel-kicker">Live input</p>
+        <h2>Camera</h2>
+        <fieldset class="camera-options">
+          <legend>Camera device</legend>
+          <div id="cameraChoices" class="camera-choices"></div>
+        </fieldset>
+        <div class="button-row"><button id="startCamera" class="primary-button">Start camera</button><button id="stopCamera" class="secondary-button">Stop camera</button></div>
+        <p>Camera support is optional. Replay remains available if the camera cannot start.</p>
+      </section>
+
       <section class="control-panel emergency-panel">
         <p class="panel-kicker">Session safety</p>
         <h2>Immediate controls</h2>
@@ -133,17 +144,6 @@
         <p id="autoSchedulePending" class="pending-change" hidden></p>
         <button id="applyAuto" class="secondary-button">Apply automatic schedule</button>
         <p>Automatic runs randomly rotate through the selected curated questions and never run more often than every 20 seconds.</p>
-      </section>
-
-      <section class="control-panel">
-        <p class="panel-kicker">Live input</p>
-        <h2>Camera</h2>
-        <fieldset class="camera-options">
-          <legend>Camera device</legend>
-          <div id="cameraChoices" class="camera-choices"></div>
-        </fieldset>
-        <div class="button-row"><button id="startCamera" class="primary-button">Start camera</button><button id="stopCamera" class="secondary-button">Stop camera</button></div>
-        <p>Camera support is optional. Replay remains available if the camera cannot start.</p>
       </section>
 
       <section class="control-panel detection-panel">
@@ -214,7 +214,7 @@
     <div><strong>Limitations</strong><p>The model can miss visible details or generate an incorrect description.</p></div>
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=18" defer></script>
+  <button id="toast" class="toast" type="button" aria-live="polite" aria-label="Dismiss notification"></button>
+  <script src="/assets/public.js?v=19" defer></script>
 </body>
 </html>
