@@ -1,7 +1,10 @@
 import pytest
 
-from scenechat.detection.prompt_learning import plan_prompt_learning
-from scenechat.models import ObjectDescription
+from scenechat.detection.prompt_learning import (
+    plan_prompt_learning,
+    sanitise_scene_analysis,
+)
+from scenechat.models import ObjectDescription, SceneAnalysis
 
 
 def candidate(label: str, description: str | None = None) -> ObjectDescription:
@@ -84,6 +87,23 @@ def test_safety_notes_block_all_candidates_without_exposing_labels():
     assert plan.outcome.rejected_count == 2
     assert plan.outcome.rejection_reasons == {"model_safety_note": 2}
     assert plan.outcome.added == []
+
+
+def test_sanitiser_preserves_safe_scene_text_and_redacts_only_blocked_terms():
+    analysis = SceneAnalysis(
+        summary="A tripod and wheelchair are beside a student.",
+        objects=[candidate("tripod"), candidate("wheelchair")],
+        relationships=["The wheelchair is behind the tripod."],
+        uncertainties=["The tripod colour is uncertain."],
+    )
+
+    result = sanitise_scene_analysis(analysis)
+
+    assert [item.label for item in result.objects] == ["tripod"]
+    assert result.summary == "A tripod and [withheld] are beside a student."
+    assert result.relationships == ["The [withheld] is behind the tripod."]
+    assert result.uncertainties == ["The tripod colour is uncertain."]
+    assert result.prompt_rejection_reasons == {"medical_or_assistive": 1}
 
 
 def test_oldest_learned_prompts_are_replaced_but_baseline_is_preserved():

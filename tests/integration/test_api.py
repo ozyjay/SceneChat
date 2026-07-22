@@ -532,6 +532,12 @@ async def test_scene_analysis_learns_safe_objects_for_both_promptable_detectors(
         assert learning["rejected_count"] == 1
         assert learning["rejection_reasons"] == {"medical_or_assistive": 1}
         assert "wheelchair" not in response.text
+        assert response.json()["analysis"]["summary"] == (
+            "A tripod and [withheld] are visible."
+        )
+        assert response.json()["analysis"]["relationships"] == [
+            "The [withheld] is beside the tripod."
+        ]
 
         state = (await client.get("/api/state")).json()
         assert state["detector_prompt_baseline"] == ["person"]

@@ -88,18 +88,47 @@ def _normalise_candidate(item: ObjectDescription) -> tuple[str | None, str | Non
     return label, None
 
 
+def _redact_terms(text: str, terms: set[str]) -> str:
+    redacted = text
+    for term in sorted(terms, key=len, reverse=True):
+        if not term:
+            continue
+        redacted = re.sub(
+            rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])",
+            "[withheld]",
+            redacted,
+            flags=re.IGNORECASE,
+        )
+    return redacted
+
+
+def _rejected_terms(item: ObjectDescription) -> set[str]:
+    """Return only terms that must not be repeated in other public fields."""
+    label = " ".join(item.label.strip().lower().split())
+    description = " ".join(item.description.strip().lower().split())
+    combined = f"{label}\n{description}"
+    terms = {label}
+    for prohibited in _PROHIBITED_TERMS.values():
+        terms.update(term for term in prohibited if _contains_term(combined, term))
+    terms.update(match.group(0) for match in _HUMAN_SUBJECT.finditer(combined))
+    return terms
+
+
 def sanitise_scene_analysis(analysis: SceneAnalysis) -> SceneAnalysis:
     """Remove unsafe candidate vocabulary before analysis reaches shared state."""
     safe_objects: list[ObjectDescription] = []
     rejection_reasons: Counter[str] = Counter()
+    rejected_terms: set[str] = set()
     has_safety_notes = bool(analysis.safety_notes)
     for item in analysis.objects:
         if has_safety_notes:
             rejection_reasons["model_safety_note"] += 1
+            rejected_terms.update(_rejected_terms(item))
             continue
         label, reason = _normalise_candidate(item)
         if reason:
             rejection_reasons[reason] += 1
+            rejected_terms.update(_rejected_terms(item))
             continue
         assert label is not None
         safe_objects.append(item.model_copy(update={"label": label}))
@@ -110,15 +139,18 @@ def sanitise_scene_analysis(analysis: SceneAnalysis) -> SceneAnalysis:
     }
     if rejection_reasons:
         updates.update(
-            summary=(
-                "The scene model returned a partial description; some details "
-                "were withheld by the safety policy."
-            ),
-            relationships=[],
-            uncertainties=[],
-            safety_notes=[
-                "Some structured objects were withheld by the safety policy."
+            summary=_redact_terms(analysis.summary, rejected_terms),
+            relationships=[
+                _redact_terms(item, rejected_terms) for item in analysis.relationships
             ],
+            uncertainties=[
+                _redact_terms(item, rejected_terms) for item in analysis.uncertainties
+            ],
+            safety_notes=(
+                ["Some structured objects were withheld by the safety policy."]
+                if analysis.safety_notes
+                else []
+            ),
         )
     return analysis.model_copy(update=updates, deep=True)
 
