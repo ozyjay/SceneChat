@@ -12,7 +12,11 @@ const detectorPromptPresets = {
 const $ = (id) => document.getElementById(id);
 
 function showToast(message) {
-  const toast = $('toast');
+  const operatorToast = $('operatorToast');
+  const publicToast = $('toast');
+  const toast = $('operator-controls').open ? operatorToast : publicToast;
+  const otherToast = toast === operatorToast ? publicToast : operatorToast;
+  otherToast.classList.remove('show');
   toast.textContent = message;
   toast.classList.add('show');
   window.setTimeout(() => toast.classList.remove('show'), 3200);
