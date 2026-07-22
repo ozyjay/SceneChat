@@ -90,6 +90,27 @@ function selectedDetectorPrompts() {
   );
 }
 
+function updateDetectorPromptToggle() {
+  const inputs = Array.from(document.querySelectorAll('input[name="detectorPrompt"]'));
+  const allSelected = inputs.length > 0 && inputs.every(input => input.checked);
+  const toggle = $('toggleAllDetectorPrompts');
+  toggle.textContent = allSelected ? 'Deselect all' : 'Select all';
+  toggle.setAttribute('aria-pressed', String(allSelected));
+  toggle.disabled = inputs.length === 0;
+}
+
+function detectorPromptSelectionChanged() {
+  updatePromptPending();
+  updateDetectorPromptToggle();
+}
+
+function toggleAllDetectorPrompts() {
+  const inputs = Array.from(document.querySelectorAll('input[name="detectorPrompt"]'));
+  const selectAll = inputs.some(input => !input.checked);
+  for (const input of inputs) input.checked = selectAll;
+  detectorPromptSelectionChanged();
+}
+
 function renderActivePrompts(prompts) {
   const panel = $('activePromptChips');
   panel.replaceChildren();
@@ -128,13 +149,16 @@ function renderOperator(next) {
   }
   const activePrompts = next.detector_prompts || [];
   renderActivePrompts(activePrompts);
-  if (document.activeElement?.name !== 'detectorPrompt') {
+  const editingDetectorPrompts = document.activeElement?.name === 'detectorPrompt'
+    || document.activeElement === $('toggleAllDetectorPrompts');
+  if (!editingDetectorPrompts) {
     const activeSet = new Set(activePrompts);
     for (const input of document.querySelectorAll('input[name="detectorPrompt"]')) {
       input.checked = activeSet.has(input.value);
     }
   }
   updatePromptPending();
+  updateDetectorPromptToggle();
   if (document.activeElement !== $('detectorPromptAutoUpdate')) {
     $('detectorPromptAutoUpdate').checked = next.detector_prompt_auto_update;
   }
@@ -269,7 +293,7 @@ function populateOperatorControls(config, initial) {
     input.name = 'detectorPrompt';
     input.value = prompt;
     input.checked = (initial.detector_prompts || []).includes(prompt);
-    input.onchange = updatePromptPending;
+    input.onchange = detectorPromptSelectionChanged;
     const name = document.createElement('span');
     name.textContent = prompt;
     label.append(input, name);
@@ -277,6 +301,8 @@ function populateOperatorControls(config, initial) {
   }
   renderActivePrompts(initial.detector_prompts || []);
   updatePromptPending();
+  updateDetectorPromptToggle();
+  $('toggleAllDetectorPrompts').onclick = toggleAllDetectorPrompts;
   $('detectorPromptAutoUpdate').checked = initial.detector_prompt_auto_update;
 
   const cameras = config.camera_devices || [{

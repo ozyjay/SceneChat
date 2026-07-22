@@ -46,6 +46,7 @@ async def test_health_public_state_and_pages():
         assert 'id="cameraChoices"' in public.text
         assert 'id="detectorModelSelect"' in public.text
         assert 'id="detectorPromptChoices"' in public.text
+        assert 'id="toggleAllDetectorPrompts"' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="detectorPromptSelect"' not in public.text
         assert 'id="analysisStatus"' in public.text
