@@ -55,7 +55,7 @@ The scene panel clearly reports when analysis is ready, actively thinking, displ
 
 SceneChat binds only to `3700`. It sends model requests only to the dedicated `http://127.0.0.1:8600/v1/vision/analyse` gateway route using the `scenechat-vision` alias and `scene-analysis-v1` contract. Readiness requires `image_input` and `structured_output`. SceneChat never calls ModelDeck management or Worker ports and cannot create, start, stop or replace Workers.
 
-The prepared Worker uses `google/gemma-4-E2B-it`, the SceneChat Gemma 4 trusted runtime, BF16, an 8,192-token context, a 512-token maximum output and an on-demand lifecycle. ModelDeck owns its model discovery, credentials, lifecycle and private routing. SceneChat has no Worker credential and performs no live model download.
+The 2026 Open Day profile uses Qwen3.5 0.8B with a 280-visual-token budget and a mock Worker. ModelDeck owns its model discovery, credentials, lifecycle and private routing. SceneChat has no Worker credential and performs no live model download.
 
 ## Configuration
 
@@ -79,7 +79,7 @@ Invalid application ports and ModelDeck management, legacy direct-model, non-loo
 
 `VISION_ANALYSIS_MAX_EDGE` is an optional transport and experimentation control for only the in-memory image copy sent to ModelDeck. The default `0` disables manual resizing; experimental limits from 256 to 1280 pixels are accepted. A value of 512 converts a 1280×720 frame to 512×288 and a 720×1280 frame to 288×512 without cropping, padding, stretching or upscaling. SceneChat uses OpenCV `INTER_AREA` interpolation when shrinking and re-encodes the request copy as JPEG at quality 82. The original camera frame remains unchanged for browser display and object detection, and neither copy is written to disk.
 
-Image dimensions, encoded byte counts, resize duration, total provider latency and the request outcome are logged for successful and timed-out ModelDeck analysis requests. These diagnostics never include image or base64 data, prompts, or visitor-derived descriptions. Pixel resizing primarily changes transport size and does not imply an inference-latency improvement: ModelDeck's trusted Worker owns Gemma 4's native processor configuration and currently uses `max_soft_tokens=280`, `patch_size=16` and `pooling_kernel_size=3`. SceneChat sends no visual-token setting. A separate ModelDeck experiment may compare allowlisted native budgets of 70, 140, 280, 560 or 1120; 140 and 280 are the recommended starting comparison.
+Image dimensions, encoded byte counts, resize duration, total provider latency and the request outcome are logged for successful and timed-out ModelDeck analysis requests. These diagnostics never include image or base64 data, prompts, or visitor-derived descriptions. Pixel resizing primarily changes transport size and does not imply an inference-latency improvement. The mock Worker owns the Qwen3.5 processor configuration and uses the selected 280-visual-token budget; SceneChat sends no visual-token setting.
 
 SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
 
@@ -104,7 +104,9 @@ pwsh -NoProfile -File scripts/download.ps1
 
 The script uses temporary partial files and refuses to replace an unrecognised existing file. SceneChat validates local files and never downloads weights during `run.ps1`.
 
-Operators can select active prompts from the approved vocabulary for either detector family. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in Gemma's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
+Operators can select active prompts from the approved vocabulary for either detector family. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in the model's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
+
+When automatic scene analysis is enabled, each interval randomly selects from the version-controlled curated questions. It avoids immediately repeating the selected question when more than one choice is available. Manual question selection is unchanged, and privacy mode prevents automatic requests.
 
 Do not promote a model backend to Open Day use until the hardware checks in [MODEL_COMPATIBILITY.md](docs/MODEL_COMPATIBILITY.md) pass.
 
@@ -119,7 +121,7 @@ Do not promote a model backend to Open Day use until the hardware checks in [MOD
 ## ModelDeck and SceneChat start-up
 
 1. In the ModelDeck repository, run its port and environment checks, then start it in Open Day mode with its PowerShell scripts.
-2. Open `http://127.0.0.1:3600`, start the prepared SceneChat Gemma 4 Worker, and wait for **ready**.
+2. Open `http://127.0.0.1:3600`, start the prepared Qwen3.5 0.8B, 280vt mock Worker, and wait for **ready**.
 3. From this repository, run `pwsh -NoProfile -File scripts/check_modeldeck.ps1`.
 4. Run `pwsh -NoProfile -File scripts/run.ps1`, open `http://127.0.0.1:3700/`, and use **Check provider readiness**.
 5. Start the camera, then apply `live` mode with `modeldeck`. If readiness fails, remain in camera-only mode or explicitly select replay/fallback.

@@ -1,6 +1,6 @@
 # Model and hardware compatibility record
 
-Last updated: 20 July 2026. Measurements marked **not run** must be completed on the actual booth system. Earlier direct-runtime evidence is retained only as historical context and does not validate the current ModelDeck route.
+Last updated: 22 July 2026. Measurements marked **not run** must be completed on the actual booth system. Earlier direct-runtime evidence is retained only as historical context and does not validate the current ModelDeck route.
 
 ## Current production candidate
 
@@ -9,12 +9,9 @@ Last updated: 20 July 2026. Measurements marked **not run** must be completed on
 | Public route | `scenechat-vision` |
 | Protocol contract | `scene-analysis-v1` |
 | Required capabilities | `image_input`, `structured_output` |
-| Model | `google/gemma-4-E2B-it` |
-| Runtime | SceneChat Gemma 4 trusted runtime |
-| Precision | BF16 |
-| Context | 8,192 tokens |
-| Maximum Worker output | 512 tokens |
-| Lifecycle | on-demand |
+| Model | Qwen3.5 0.8B |
+| Runtime | ModelDeck mock Worker |
+| Visual-token budget | 280 |
 | SceneChat gateway | `http://127.0.0.1:8600` |
 | Preferred endpoint | `POST /v1/vision/analyse` |
 
@@ -70,7 +67,7 @@ The opt-in acceptance uses only the committed synthetic `demo_booth.png`. It doe
 
 - Camera device 0 previously sustained 1,769 frames over 60.01 seconds at 1280×720, or 29.48 effective FPS, with no read failures. This is not the required 60-minute run.
 - Ten camera close/reopen cycles returned a frame. A physical USB disconnect/reconnect drill remains required.
-- A historical Gemma 4 E2B direct-runtime probe produced structured image responses with roughly six-second median latency across ten requests. That path did not use the current ModelDeck gateway, trusted-runtime Worker or published Event route.
+- A historical Gemma 4 E2B direct-runtime probe produced structured image responses with roughly six-second median latency across ten requests. That superseded path did not use the current Qwen3.5 mock Worker profile, ModelDeck gateway or published Event route.
 - The earlier application flow rejected a concurrent request, rejected a result made stale by reset, blocked analysis while privacy was active, and degraded to camera-only mode after runtime failure. Current offline tests cover the equivalent ModelDeck-facing logic, but physical confirmation remains required.
 - Earlier YOLO11 measurements are superseded by the promptable YOLOE/YOLO-World design and do not approve a live detector for Open Day use.
 

@@ -112,7 +112,7 @@
           </div>
           <label class="check-label"><input id="detectorPromptAutoUpdate" type="checkbox"> Add approved objects after each scene description</label>
           <button id="applyDetectorPrompts" class="secondary-button">Apply object prompts</button>
-          <p>Gemma suggestions are accepted only when they match the approved vocabulary.</p>
+          <p>Model suggestions are accepted only when they match the approved vocabulary.</p>
         </div>
         <div class="button-row"><button id="startCamera" class="primary-button">Start camera</button><button id="stopCamera" class="secondary-button">Stop camera</button></div>
         <p>Camera support is optional. Replay remains available if the camera cannot start.</p>
@@ -124,6 +124,7 @@
         <div class="button-row"><button id="triggerAnalysis" class="primary-button">Generate scene description</button><button id="clearAnalysis" class="secondary-button">Clear description</button></div>
         <div class="inline-fields"><label class="check-label"><input id="autoEnabled" type="checkbox"> Automatic</label><label>Interval (seconds)<input id="autoInterval" type="number" min="3" max="60" value="5"></label></div>
         <button id="applyAuto" class="secondary-button">Apply automatic schedule</button>
+        <p>Each automatic analysis randomly chooses a curated question and avoids repeating the previous question when possible.</p>
       </section>
 
       <section class="control-panel diagnostics-panel">

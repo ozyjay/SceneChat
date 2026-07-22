@@ -376,7 +376,7 @@ async def test_yoloe_prompts_are_operator_approved(monkeypatch):
         await lifespan.__aexit__(None, None, None)
 
 
-def test_gemma_labels_only_add_exact_approved_detector_prompts():
+def test_model_labels_only_add_exact_approved_detector_prompts():
     settings = Settings(
         _env_file=None,
         detector_prompts=["person", "computer mouse"],

@@ -39,7 +39,7 @@
 
 **Goal:** production rehearsal and freeze.  
 **Delivered foundation:** one deterministic `.env`-driven launcher, privacy defaults, graceful resource release, and offline tests.
-**Remaining model-focused gate:** freeze the prepared `google/gemma-4-E2B-it` trusted-runtime Worker fingerprint, run the physical camera-disconnect and gateway-outage drills, complete the 60-minute camera test and two-hour camera-plus-model burn-in, cold reboot, and staff rehearsal. The earlier direct-runtime outage drill does not substitute for the ModelDeck gateway drill.
+**Remaining model-focused gate:** freeze the prepared Qwen3.5 0.8B, 280vt mock Worker fingerprint, run the physical camera-disconnect and gateway-outage drills, complete the 60-minute camera test and two-hour camera-plus-model burn-in, cold reboot, and staff rehearsal. The earlier direct-runtime outage drill does not substitute for the ModelDeck gateway drill.
 
 ## Risks and go/no-go rules
 

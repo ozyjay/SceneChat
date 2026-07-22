@@ -5,7 +5,7 @@
 1. Confirm signs are visible and the camera points only into the demonstration area.
 2. In the ModelDeck repository, run `pwsh -NoProfile -File scripts/check_ports.ps1` and `pwsh -NoProfile -File scripts/check_environment.ps1`.
 3. In that repository, run `pwsh -NoProfile -File scripts/run.ps1 -OpenDay`, then open `http://127.0.0.1:3600`.
-4. Start the prepared `google/gemma-4-E2B-it` SceneChat Gemma 4 trusted-runtime Worker. Confirm BF16, 8,192-token context, 512-token maximum output and on-demand lifecycle, then wait for **ready**. ModelDeck owns discovery, credentials, Worker lifecycle and routing.
+4. Start the prepared Qwen3.5 0.8B mock Worker. Confirm its 280-visual-token budget, then wait for **ready**. ModelDeck owns discovery, credentials, Worker lifecycle and routing.
 5. Return to this repository and run `pwsh -NoProfile -File scripts/check_modeldeck.ps1`. It checks only the gateway on port `8600`, the `scenechat-vision` route, `image_input`, `structured_output`, readiness and disabled cloud fallback.
 6. Run `pwsh -NoProfile -File scripts/run.ps1`. It starts SceneChat in the background and exits. A failed ModelDeck preflight produces a warning but does not block camera-only, replay or mock operation.
 7. Open `http://127.0.0.1:3700/`, expand **Operator controls**, select **Check provider readiness**, and confirm health, mode, camera, provider and latency. Collapse the panel and use the same page full-screen for visitors.
@@ -16,7 +16,9 @@ SceneChat has no ModelDeck Worker credential. Never copy `MODELDECK_SCENECHAT_AP
 
 In **Operator controls**, select the named camera and, when configured, the allowlisted object detector model. Start the camera and confirm the live image and camera processing rate. Select `modeldeck`, confirm **ModelDeck · scenechat-vision · available**, then select **live**. The no-detector configuration must show no object boxes or detector claims. Detector switching briefly pauses and restarts the camera. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
 
-For YOLOE or YOLO-World, select a small approved prompt set before opening. Enable automatic prompt updates only after confirming that Gemma's structured object labels remain suitable. The base prompts are restored whenever a new scene analysis does not return additional approved labels; reset continues to clear visitor-facing generated text but does not change the operator's detector configuration.
+For YOLOE or YOLO-World, select a small approved prompt set before opening. Enable automatic prompt updates only after confirming that the model's structured object labels remain suitable. The base prompts are restored whenever a new scene analysis does not return additional approved labels; reset continues to clear visitor-facing generated text but does not change the operator's detector configuration.
+
+When enabling automatic scene analysis, choose the interval and confirm that successive requests use randomly selected curated questions. The scheduler avoids an immediate repeat when multiple questions are available and pauses while the privacy screen is active.
 
 ## Between visitors
 

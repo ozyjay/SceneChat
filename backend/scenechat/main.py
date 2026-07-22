@@ -3,6 +3,7 @@
 import asyncio
 import json
 import mimetypes
+import random
 import resource
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -107,6 +108,16 @@ def _load_questions() -> list[str]:
     return json.loads((ROOT / "prompts" / "curated_questions.json").read_text("utf-8"))
 
 
+def _select_automatic_question(questions: list[str], current: str) -> str:
+    """Randomly choose a curated question, avoiding an immediate repeat."""
+    candidates = [question for question in questions if question != current]
+    if not candidates:
+        candidates = list(questions)
+    if not candidates:
+        raise ValueError("At least one curated question is required")
+    return random.choice(candidates)
+
+
 def _approved_detector_prompts(configured: Settings, labels: list[str]) -> list[str]:
     approved = {item.casefold(): item for item in configured.detector_prompt_allowlist}
     selected = list(configured.detector_prompts)
@@ -185,6 +196,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         registry = ReplayRegistry()
         scenario = registry.get(configured.replay_scenario)
+        curated_questions = _load_questions()
         initial_provider = {
             "mock": "mock",
             "replay": "replay",
@@ -245,7 +257,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         analysis = AnalysisService(
             state,
             providers,
-            set(_load_questions()),
+            set(curated_questions),
             configured.vision_request_timeout_seconds,
         )
         app.state.settings = configured
@@ -254,6 +266,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.state_store = state
         app.state.camera = camera
         app.state.analysis = analysis
+        app.state.curated_questions = curated_questions
         monitor = asyncio.create_task(_camera_monitor(camera, state))
         automatic = asyncio.create_task(_automatic_analysis(app))
         try:
@@ -317,7 +330,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 }
             )
         return {
-            "questions": _load_questions(),
+            "questions": request.app.state.curated_questions,
             "modes": ["development", "live", "detector-only", "mock", "replay"],
             "providers": ["modeldeck", "replay", "fallback", "mock"],
             "modeldeck_contract": {
@@ -690,7 +703,11 @@ async def _automatic_analysis(app: FastAPI) -> None:
     while True:
         await asyncio.sleep(0.5)
         state = await app.state.state_store.snapshot()
-        if not state.auto_analyse or state.internal_mode == "detector-only":
+        if (
+            not state.auto_analyse
+            or state.internal_mode == "detector-only"
+            or state.privacy_screen
+        ):
             last_started = loop.time()
             continue
         if loop.time() - last_started < state.auto_analyse_interval_seconds:
@@ -700,8 +717,11 @@ async def _automatic_analysis(app: FastAPI) -> None:
         if not image:
             image = app.state.registry.image_path(state.replay_scenario).read_bytes()
         try:
+            question = _select_automatic_question(
+                app.state.curated_questions, state.selected_question
+            )
             analysis_result, applied = await app.state.analysis.analyse(
-                image, state.selected_question
+                image, question
             )
             if applied:
                 await _refresh_detector_prompts_from_analysis(

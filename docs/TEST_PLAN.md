@@ -8,7 +8,7 @@ Run `& .venv/bin/python -m pytest -m "not hardware"`.
 
 ## Optional hardware tests
 
-The current Gemma-focused scope runs these checks with `DETECTOR_BACKEND=none`. Detector-candidate benchmarking is deferred and is required only before live object detection is re-enabled.
+The current Qwen3.5-focused scope runs these checks with `DETECTOR_BACKEND=none`. Detector-candidate benchmarking is deferred and is required only before live object detection is re-enabled.
 
 1. Before re-enabling live detection, benchmark at least two locally approved detector weights on the same 300+ frame booth video.
 2. Run empty room, one person, several people, clutter, partial occlusion, reflections, poor light, and backlight cases.
