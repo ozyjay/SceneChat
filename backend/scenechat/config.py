@@ -33,6 +33,11 @@ DEFAULT_DETECTOR_PROMPT_ALLOWLIST = DEFAULT_DETECTOR_PROMPTS + [
     "book",
     "backpack",
     "cabinet",
+    "headphones",
+    "pen",
+    "paper",
+    "glasses",
+    "potted plant",
 ]
 
 
@@ -76,7 +81,7 @@ class Settings(BaseSettings):
     vision_analysis_max_edge: int = Field(default=0, ge=0, le=1280)
     vision_max_tokens: int = Field(default=512, ge=128, le=512)
     auto_analyse: bool = False
-    auto_analyse_interval_seconds: float = Field(default=5, ge=3, le=60)
+    auto_analyse_interval_seconds: float = Field(default=20, ge=20, le=60)
 
     store_frames: bool = False
     store_video: bool = False

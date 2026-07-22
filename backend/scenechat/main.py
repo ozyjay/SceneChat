@@ -71,7 +71,7 @@ class DetectorPromptRequest(BaseModel):
 
 class AutoAnalyseRequest(BaseModel):
     enabled: bool
-    interval_seconds: float = Field(default=5, ge=3, le=60)
+    interval_seconds: float = Field(default=20, ge=20, le=60)
 
 
 class ReplayRequest(BaseModel):

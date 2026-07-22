@@ -15,6 +15,22 @@ def test_safe_defaults_do_not_store_frames():
     assert settings.vision_max_tokens == 512
 
 
+def test_default_detector_allowlist_contains_common_objects_within_active_limit():
+    settings = Settings(_env_file=None)
+
+    assert {"headphones", "pen", "paper", "glasses", "potted plant"}.issubset(
+        settings.detector_prompt_allowlist
+    )
+    assert len(settings.detector_prompt_allowlist) == 20
+
+
+def test_automatic_analysis_interval_has_a_twenty_second_minimum():
+    assert Settings(_env_file=None).auto_analyse_interval_seconds == 20
+
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, auto_analyse_interval_seconds=19.9)
+
+
 @pytest.mark.parametrize("field", ["store_frames", "store_video"])
 def test_storage_is_rejected(field):
     with pytest.raises(ValidationError, match="storage are not supported"):

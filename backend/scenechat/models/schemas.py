@@ -92,7 +92,7 @@ class AppState(BaseModel):
     last_model_latency_ms: float | None = None
     analysis_in_progress: bool = False
     auto_analyse: bool = False
-    auto_analyse_interval_seconds: float = 5
+    auto_analyse_interval_seconds: float = 20
     staff_error: str | None = None
 
 

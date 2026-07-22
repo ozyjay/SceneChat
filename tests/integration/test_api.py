@@ -154,6 +154,24 @@ async def test_detector_only_disables_analysis():
 
 
 @pytest.mark.anyio
+async def test_automatic_analysis_interval_requires_at_least_twenty_seconds():
+    async with AppClient() as client:
+        rejected = await client.post(
+            "/api/auto-analyse",
+            json={"enabled": True, "interval_seconds": 19.9},
+        )
+        assert rejected.status_code == 422
+
+        accepted = await client.post(
+            "/api/auto-analyse",
+            json={"enabled": True, "interval_seconds": 20},
+        )
+        assert accepted.status_code == 200
+        assert accepted.json()["auto_analyse"] is True
+        assert accepted.json()["auto_analyse_interval_seconds"] == 20
+
+
+@pytest.mark.anyio
 async def test_live_mode_without_detector_uses_accurate_public_wording():
     settings = Settings(
         scenechat_mode="live",
