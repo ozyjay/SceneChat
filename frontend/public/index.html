@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=11">
+  <link rel="stylesheet" href="/assets/styles.css?v=12">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -16,7 +16,7 @@
       <div id="modeBadge" class="mode-badge">Prepared demonstration</div>
       <button id="headerPrivacy" class="danger-button compact-button">Hide camera</button>
       <button id="headerReset" class="secondary-button compact-button">Reset session</button>
-      <a id="operatorControlsLink" href="#operator-controls" class="secondary-button">Operator controls</a>
+      <button id="operatorControlsLink" class="secondary-button">Operator controls</button>
     </div>
   </header>
 
@@ -67,11 +67,15 @@
     <div id="questionButtons" class="question-grid"></div>
   </section>
 
-  <details id="operator-controls" class="operator-shell">
-    <summary>
-      <span>Operator controls</span>
-      <small>Session, analysis, camera and object detection</small>
-    </summary>
+  <dialog id="operator-controls" class="operator-dialog" aria-labelledby="operatorControlsTitle">
+    <div class="operator-dialog-header">
+      <div>
+        <p class="panel-kicker">Staff interface</p>
+        <h2 id="operatorControlsTitle">Operator controls</h2>
+        <p>Session, analysis, camera and object detection</p>
+      </div>
+      <button id="closeOperatorControls" class="secondary-button">Close</button>
+    </div>
     <div class="operator-layout">
       <section class="control-panel emergency-panel">
         <p class="panel-kicker">Session safety</p>
@@ -181,7 +185,7 @@
         <div id="staffError" class="staff-error" hidden></div>
       </details>
     </div>
-  </details>
+  </dialog>
 
   <footer class="explanation">
     <div><strong>What this shows</strong><p>A local multimodal model generates a likely interpretation of the live scene. Prepared object labels may also be shown in demonstration modes.</p></div>
@@ -189,6 +193,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=12" defer></script>
+  <script src="/assets/public.js?v=13" defer></script>
 </body>
 </html>

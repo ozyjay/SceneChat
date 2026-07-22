@@ -491,11 +491,13 @@ async function updateHealth() {
   }
 }
 
-function revealOperatorControls() {
-  if (window.location.hash !== '#operator-controls') return;
+function openOperatorControls() {
   const controls = $('operator-controls');
-  controls.open = true;
-  controls.scrollIntoView({block: 'start'});
+  if (!controls.open) controls.showModal();
+}
+
+function revealOperatorControls() {
+  if (window.location.hash === '#operator-controls') openOperatorControls();
 }
 
 async function initialise() {
@@ -525,8 +527,17 @@ async function initialise() {
   }, 180);
   await updateHealth();
   window.setInterval(updateHealth, 5000);
-  $('operatorControlsLink').addEventListener('click', () => {
-    $('operator-controls').open = true;
+  $('operatorControlsLink').addEventListener('click', openOperatorControls);
+  $('closeOperatorControls').addEventListener('click', () => {
+    $('operator-controls').close();
+  });
+  $('operator-controls').addEventListener('click', (event) => {
+    if (event.target === $('operator-controls')) $('operator-controls').close();
+  });
+  $('operator-controls').addEventListener('close', () => {
+    if (window.location.hash === '#operator-controls') {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
   });
   revealOperatorControls();
   window.addEventListener('hashchange', revealOperatorControls);
