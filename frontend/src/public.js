@@ -3,6 +3,7 @@ const state = {
   current: null,
   detectorEnabled: true,
   cameraLabels: new Map(),
+  toastTimer: null,
 };
 const detectorPromptPresets = {
   essentials: ['person', 'laptop', 'monitor', 'microphone', 'camera'],
@@ -19,14 +20,23 @@ function showToast(message) {
   otherToast.classList.remove('show');
   toast.textContent = message;
   toast.classList.add('show');
-  window.setTimeout(() => toast.classList.remove('show'), 3200);
+  window.clearTimeout(state.toastTimer);
+  state.toastTimer = window.setTimeout(() => toast.classList.remove('show'), 5500);
+}
+
+function formatErrorDetail(detail) {
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail.map(item => item?.msg || String(item)).join(' ');
+  }
+  return detail?.message || 'The request could not be completed.';
 }
 
 async function request(path, options = {}) {
   const response = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...options});
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(payload.detail || 'The request could not be completed.');
+    throw new Error(formatErrorDetail(payload.detail));
   }
   return response.json();
 }
@@ -374,7 +384,7 @@ async function act(action, success) {
   try {
     const result = await action();
     if (result?.revision !== undefined) render(result);
-    if (success) showToast(success);
+    if (success) showToast(typeof success === 'function' ? success(result) : success);
   } catch (error) {
     showToast(error.message);
   }
@@ -465,30 +475,48 @@ function populateOperatorControls(config, initial) {
   $('providerSelect').value = initial.provider;
   $('scenarioSelect').value = initial.replay_scenario;
 
-  $('privacyOn').onclick = () => act(() => post('/api/privacy', {enabled: true}), 'Privacy screen activated.');
-  $('privacyOff').onclick = () => act(() => post('/api/privacy', {enabled: false}), 'Public camera view restored.');
-  $('resetSession').onclick = () => act(() => post('/api/reset'), 'Session reset and generated text cleared.');
+  $('privacyOn').onclick = () => act(
+    () => post('/api/privacy', {enabled: true}),
+    'Privacy screen activated. The camera feed is hidden, new analyses are blocked, and any in-flight result was invalidated.',
+  );
+  $('privacyOff').onclick = () => act(
+    () => post('/api/privacy', {enabled: false}),
+    'Camera view restored. Live frames and scene analysis are available again.',
+  );
+  $('resetSession').onclick = () => act(
+    () => post('/api/reset'),
+    'Session reset. Generated visitor text, latency and staff errors were cleared; detector settings were preserved.',
+  );
   $('headerPrivacy').onclick = $('privacyOn').onclick;
   $('headerReset').onclick = $('resetSession').onclick;
-  $('detectorOnly').onclick = () => act(() => post('/api/mode', {mode: 'detector-only'}), 'Scene analysis disabled; camera fallback active.');
+  $('detectorOnly').onclick = () => act(
+    () => post('/api/mode', {mode: 'detector-only'}),
+    'Camera-only mode activated. The live camera and fast object detector remain available; scene descriptions are disabled.',
+  );
   $('applyMode').onclick = () => act(async () => {
     await post('/api/replay', {scenario: $('scenarioSelect').value});
     await post('/api/provider', {provider: $('providerSelect').value});
     return post('/api/mode', {mode: $('modeSelect').value});
-  }, 'Mode and provider updated.');
+  }, result => `Run configuration applied. Mode: ${result.internal_mode}; provider: ${result.provider}; replay scenario: ${result.replay_scenario}.`);
   $('checkProvider').onclick = () => act(
     () => post('/api/provider/check'),
-    'Provider readiness checked.',
+    result => `Provider check complete. ${result.provider} is ${result.provider_available ? 'available' : 'unavailable'}. ${result.provider_status_message}`,
   );
   $('startCamera').onclick = () => act(() => {
     const selected = document.querySelector('input[name="cameraDevice"]:checked');
     if (!selected) throw new Error('Choose a camera first.');
     return post('/api/camera/start', {device: Number(selected.value)});
-  }, 'Camera start requested.');
-  $('stopCamera').onclick = () => act(() => post('/api/camera/stop'), 'Camera stopped.');
+  }, result => {
+    const label = state.cameraLabels.get(String(result.camera_device)) || `Camera ${result.camera_device}`;
+    return `${label} started. Fast object detection is using ${result.detector_model || result.detector_backend}.`;
+  });
+  $('stopCamera').onclick = () => act(
+    () => post('/api/camera/stop'),
+    'Camera stopped. Live frames and continuous object detection are no longer running; replay remains available.',
+  );
   $('applyDetectorModel').onclick = () => act(
     () => post('/api/detector/model', {model: $('detectorModelSelect').value}),
-    'Object detector model switched.',
+    result => `Object detector switched to ${result.detector_model}. The active prompt selection was reapplied.`,
   );
   $('applyDetectorPrompts').onclick = () => act(() => {
     const prompts = selectedDetectorPrompts();
@@ -497,14 +525,22 @@ function populateOperatorControls(config, initial) {
       prompts,
       auto_update: $('detectorPromptAutoUpdate').checked,
     });
-  }, 'Detector object prompts updated.');
-  $('triggerAnalysis').onclick = () => act(() => post('/api/analyse', {question: $('questionSelect').value}), 'Scene description updated.');
-  $('clearAnalysis').onclick = () => act(() => post('/api/analysis/clear'), 'Scene description cleared.');
+  }, result => `Object detection updated. ${result.detector_prompts.length} object prompts are active. Scene-analysis additions are ${result.detector_prompt_auto_update ? 'enabled' : 'disabled'}.`);
+  $('triggerAnalysis').onclick = () => act(
+    () => post('/api/analyse', {question: $('questionSelect').value}),
+    result => `Scene analysis completed for “${$('questionSelect').value}”. The ${result.analysis.provider} result was ${result.applied ? 'displayed' : 'discarded because the session changed'}.`,
+  );
+  $('clearAnalysis').onclick = () => act(
+    () => post('/api/analysis/clear'),
+    'Scene description cleared. The current camera frame and detector boxes remain visible.',
+  );
   $('applyAuto').onclick = () => act(() => post('/api/auto-analyse', {
     enabled: $('autoEnabled').checked,
     interval_seconds: Number($('autoInterval').value),
     questions: selectedAutoQuestions(),
-  }), 'Automatic schedule updated.');
+  }), result => result.auto_analyse
+    ? `Automatic scene analysis enabled. ${result.auto_analyse_questions.length} curated questions will rotate every ${result.auto_analyse_interval_seconds} seconds.`
+    : 'Automatic scene analysis disabled. Curated questions remain available for manual runs.');
 }
 
 async function updateHealth() {
@@ -544,7 +580,10 @@ async function initialise() {
   const events = new EventSource('/api/events');
   events.onmessage = (event) => render(JSON.parse(event.data));
   $('resetButton').addEventListener('click', async () => {
-    try { render(await request('/api/reset', {method: 'POST'})); showToast('SceneChat is ready for the next visitor.'); }
+    try {
+      render(await request('/api/reset', {method: 'POST'}));
+      showToast('SceneChat is ready for the next visitor. Generated text was cleared and any in-flight analysis was invalidated.');
+    }
     catch (error) { showToast(error.message); }
   });
   window.setInterval(() => {

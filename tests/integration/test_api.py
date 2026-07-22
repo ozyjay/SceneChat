@@ -56,7 +56,7 @@ async def test_health_public_state_and_pages():
         assert 'id="autoScheduleStatus"' in public.text
         assert 'id="headerPrivacy"' in public.text
         assert '/assets/styles.css?v=13' in public.text
-        assert '/assets/public.js?v=15' in public.text
+        assert '/assets/public.js?v=16' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="detectorPromptSelect"' not in public.text
         assert 'id="analysisStatus"' in public.text
@@ -77,6 +77,10 @@ async def test_health_public_state_and_pages():
         assert health.json()["status"] == "ok"
         assert (await client.get("/api/diagnostics")).status_code == 200
         assert (await client.get("/api/frame")).status_code == 200
+        script = await client.get("/assets/public.js?v=16")
+        assert "Automatic scene analysis enabled" in script.text
+        assert "Object detection updated" in script.text
+        assert "Privacy screen activated" in script.text
 
 
 @pytest.mark.anyio

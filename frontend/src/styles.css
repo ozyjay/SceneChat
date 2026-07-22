@@ -86,7 +86,7 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .explanation { padding: 1rem 3vw 2.5rem; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 2rem; color: var(--muted); }
 .explanation strong { color: var(--ink); font-size: 1.05rem; }
 .explanation p { margin: .4rem 0 0; line-height: 1.5; }
-.toast { position: fixed; right: 1.2rem; bottom: 1.2rem; max-width: 30rem; background: #eaf8f7; color: #09262a; padding: .9rem 1.1rem; border-radius: .6rem; box-shadow: 0 12px 40px #0008; transform: translateY(8rem); transition: transform .2s; z-index: 20; }
+.toast { position: fixed; right: 1.2rem; bottom: 1.2rem; max-width: min(38rem, calc(100vw - 2.4rem)); background: #eaf8f7; color: #09262a; padding: 1rem 1.15rem; border-radius: .6rem; box-shadow: 0 12px 40px #0008; line-height: 1.45; transform: translateY(10rem); transition: transform .2s; z-index: 20; }
 .toast.show { transform: translateY(0); }
 .operator-toast { top: max(1rem, 5vh); right: max(1rem, 4vw); bottom: auto; transform: translateY(-8rem); z-index: 30; }
 .operator-dialog { width: min(94vw, 1500px); max-width: none; max-height: 92vh; padding: 0; color: var(--ink); background: #0b1d24; border: 1px solid var(--line); border-radius: 1.2rem; box-shadow: 0 24px 80px #000b; overflow-y: auto; }
