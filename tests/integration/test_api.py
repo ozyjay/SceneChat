@@ -49,8 +49,11 @@ async def test_health_public_state_and_pages():
         assert 'id="detectorPromptSelectionCount"' in public.text
         assert 'id="selectAllDetectorPrompts"' in public.text
         assert 'id="clearAllDetectorPrompts"' in public.text
-        assert '/assets/styles.css?v=10' in public.text
-        assert '/assets/public.js?v=11' in public.text
+        assert 'id="autoQuestionChoices"' in public.text
+        assert 'id="autoScheduleStatus"' in public.text
+        assert 'id="headerPrivacy"' in public.text
+        assert '/assets/styles.css?v=11' in public.text
+        assert '/assets/public.js?v=12' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="detectorPromptSelect"' not in public.text
         assert 'id="analysisStatus"' in public.text
@@ -164,11 +167,28 @@ async def test_automatic_analysis_interval_requires_at_least_twenty_seconds():
 
         accepted = await client.post(
             "/api/auto-analyse",
-            json={"enabled": True, "interval_seconds": 20},
+            json={
+                "enabled": True,
+                "interval_seconds": 20,
+                "questions": ["What objects can you see?"],
+            },
         )
         assert accepted.status_code == 200
         assert accepted.json()["auto_analyse"] is True
         assert accepted.json()["auto_analyse_interval_seconds"] == 20
+        assert accepted.json()["auto_analyse_questions"] == [
+            "What objects can you see?"
+        ]
+
+        non_curated = await client.post(
+            "/api/auto-analyse",
+            json={
+                "enabled": True,
+                "interval_seconds": 20,
+                "questions": ["Identify this visitor"],
+            },
+        )
+        assert non_curated.status_code == 400
 
 
 @pytest.mark.anyio
@@ -399,7 +419,7 @@ async def test_yoloe_prompts_are_operator_approved(monkeypatch):
         await lifespan.__aexit__(None, None, None)
 
 
-def test_model_labels_only_add_exact_approved_detector_prompts():
+def test_model_labels_extend_active_prompts_without_restoring_defaults():
     settings = Settings(
         _env_file=None,
         detector_prompts=["person", "computer mouse"],
@@ -407,5 +427,7 @@ def test_model_labels_only_add_exact_approved_detector_prompts():
     )
 
     assert main_module._approved_detector_prompts(
-        settings, ["Camera", "red-haired person", "a black computer mouse"]
-    ) == ["person", "computer mouse", "camera"]
+        settings,
+        ["computer mouse"],
+        ["Camera", "red-haired person", "a black computer mouse"],
+    ) == ["computer mouse", "camera"]

@@ -4,6 +4,11 @@ const state = {
   detectorEnabled: true,
   cameraLabels: new Map(),
 };
+const detectorPromptPresets = {
+  essentials: ['person', 'laptop', 'monitor', 'microphone', 'camera'],
+  technology: ['computer mouse', 'keyboard', 'laptop', 'monitor', 'mobile phone', 'headphones'],
+  room: ['person', 'chair', 'table', 'book', 'backpack', 'bottle', 'cup', 'potted plant'],
+};
 const $ = (id) => document.getElementById(id);
 
 function showToast(message) {
@@ -109,6 +114,57 @@ function setAllDetectorPrompts(checked) {
   detectorPromptSelectionChanged();
 }
 
+function applyDetectorPromptPreset(presetName) {
+  const prompts = new Set(detectorPromptPresets[presetName] || []);
+  for (const input of document.querySelectorAll('input[name="detectorPrompt"]')) {
+    input.checked = prompts.has(input.value);
+  }
+  detectorPromptSelectionChanged();
+}
+
+function selectedAutoQuestions() {
+  return Array.from(
+    document.querySelectorAll('input[name="autoQuestion"]:checked'),
+    input => input.value,
+  );
+}
+
+function updateAutoQuestionControls() {
+  const inputs = Array.from(document.querySelectorAll('input[name="autoQuestion"]'));
+  const selectedCount = inputs.filter(input => input.checked).length;
+  $('autoQuestionSelectionCount').textContent = `${selectedCount} of ${inputs.length} selected`;
+  $('selectAllAutoQuestions').disabled = inputs.length === 0 || selectedCount === inputs.length;
+  $('clearAllAutoQuestions').disabled = selectedCount === 0;
+}
+
+function updateAutoSchedulePending() {
+  const selected = selectedAutoQuestions();
+  const active = new Set(state.current?.auto_analyse_questions || []);
+  const questionsChanged = selected.length !== active.size
+    || selected.some(question => !active.has(question));
+  const changed = $('autoEnabled').checked !== state.current?.auto_analyse
+    || Number($('autoInterval').value) !== state.current?.auto_analyse_interval_seconds
+    || questionsChanged;
+  const pending = $('autoSchedulePending');
+  pending.hidden = !changed;
+  pending.textContent = selected.length
+    ? 'Schedule changed — apply it to activate these settings.'
+    : 'Choose at least one automatic question before applying.';
+  $('applyAuto').disabled = selected.length === 0;
+}
+
+function autoScheduleSelectionChanged() {
+  updateAutoQuestionControls();
+  updateAutoSchedulePending();
+}
+
+function setAllAutoQuestions(checked) {
+  for (const input of document.querySelectorAll('input[name="autoQuestion"]')) {
+    input.checked = checked;
+  }
+  autoScheduleSelectionChanged();
+}
+
 function renderActivePrompts(prompts) {
   const panel = $('activePromptChips');
   panel.replaceChildren();
@@ -129,7 +185,9 @@ function renderActivePrompts(prompts) {
 function updatePromptPending() {
   const active = new Set(state.current?.detector_prompts || []);
   const selected = selectedDetectorPrompts();
-  const changed = selected.length !== active.size || selected.some(prompt => !active.has(prompt));
+  const changed = selected.length !== active.size
+    || selected.some(prompt => !active.has(prompt))
+    || $('detectorPromptAutoUpdate').checked !== state.current?.detector_prompt_auto_update;
   const pending = $('detectorPromptPending');
   pending.hidden = !changed;
   pending.textContent = selected.length
@@ -166,6 +224,25 @@ function renderOperator(next) {
   if (document.activeElement !== $('detectorPromptAutoUpdate')) {
     $('detectorPromptAutoUpdate').checked = next.detector_prompt_auto_update;
   }
+  const editingAutoSchedule = document.activeElement === $('autoEnabled')
+    || document.activeElement === $('autoInterval')
+    || document.activeElement?.name === 'autoQuestion'
+    || document.activeElement === $('selectAllAutoQuestions')
+    || document.activeElement === $('clearAllAutoQuestions');
+  if (!editingAutoSchedule) {
+    $('autoEnabled').checked = next.auto_analyse;
+    $('autoInterval').value = next.auto_analyse_interval_seconds;
+    const activeQuestions = new Set(next.auto_analyse_questions || []);
+    for (const input of document.querySelectorAll('input[name="autoQuestion"]')) {
+      input.checked = activeQuestions.has(input.value);
+    }
+  }
+  const questionCount = next.auto_analyse_questions?.length || 0;
+  $('autoScheduleStatus').textContent = next.auto_analyse
+    ? `Automatic analysis on · every ${next.auto_analyse_interval_seconds} seconds · ${questionCount} questions in rotation`
+    : 'Automatic analysis is off';
+  updateAutoQuestionControls();
+  updateAutoSchedulePending();
   const providerName = next.provider === 'modeldeck' ? 'ModelDeck · scenechat-vision' : next.provider;
   $('providerValue').textContent = `${providerName} · ${next.provider_available ? 'available' : 'unavailable'}`;
   $('providerGuidance').textContent = next.provider === 'modeldeck'
@@ -173,14 +250,13 @@ function renderOperator(next) {
     : `${providerName} is an explicit offline provider.`;
   $('latencyValue').textContent = next.last_model_latency_ms === null ? '—' : `${next.last_model_latency_ms.toFixed(0)} ms`;
   $('analysisValue').textContent = next.analysis_in_progress ? 'Running' : 'Idle';
-  if (document.activeElement !== $('autoEnabled')) $('autoEnabled').checked = next.auto_analyse;
-  if (document.activeElement !== $('autoInterval')) $('autoInterval').value = next.auto_analyse_interval_seconds;
   if (next.camera_running) {
     const activeCamera = document.querySelector(`input[name="cameraDevice"][value="${next.camera_device}"]`);
     if (activeCamera) activeCamera.checked = true;
   }
   $('privacyOn').disabled = next.privacy_screen;
   $('privacyOff').disabled = !next.privacy_screen;
+  $('headerPrivacy').disabled = next.privacy_screen;
   $('staffError').hidden = !next.staff_error;
   $('staffError').textContent = next.staff_error || '';
 }
@@ -250,6 +326,11 @@ function render(next) {
     button.disabled = next.analysis_in_progress || next.internal_mode === 'detector-only' || next.privacy_screen;
     button.classList.toggle('active', button.dataset.question === next.selected_question);
   });
+  $('questionButtons').hidden = next.auto_analyse;
+  $('questionsTitle').textContent = next.auto_analyse ? 'Automatic questions are running' : 'Choose a question';
+  $('questionModeHint').textContent = next.auto_analyse
+    ? `SceneChat randomly rotates through ${next.auto_analyse_questions.length} curated questions every ${next.auto_analyse_interval_seconds} seconds.`
+    : 'Select a prepared question to analyse the current scene.';
   $('triggerAnalysis').disabled = next.analysis_in_progress
     || next.internal_mode === 'detector-only'
     || next.privacy_screen;
@@ -279,7 +360,21 @@ function populateOperatorControls(config, initial) {
     $('providerSelect').add(new Option(label, provider));
   }
   for (const scenario of config.scenarios) $('scenarioSelect').add(new Option(scenario.title, scenario.id));
-  for (const question of config.questions) $('questionSelect').add(new Option(question, question));
+  for (const question of config.questions) {
+    $('questionSelect').add(new Option(question, question));
+    const label = document.createElement('label');
+    label.className = 'auto-question-choice';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'autoQuestion';
+    input.value = question;
+    input.checked = (initial.auto_analyse_questions || config.questions).includes(question);
+    input.onchange = autoScheduleSelectionChanged;
+    const text = document.createElement('span');
+    text.textContent = question;
+    label.append(input, text);
+    $('autoQuestionChoices').append(label);
+  }
   const detectorModels = config.detector_models || [];
   $('detectorModelControls').hidden = detectorModels.length === 0;
   for (const model of detectorModels) {
@@ -308,7 +403,17 @@ function populateOperatorControls(config, initial) {
   updateDetectorPromptToggle();
   $('selectAllDetectorPrompts').onclick = () => setAllDetectorPrompts(true);
   $('clearAllDetectorPrompts').onclick = () => setAllDetectorPrompts(false);
+  document.querySelectorAll('[data-prompt-preset]').forEach((button) => {
+    button.onclick = () => applyDetectorPromptPreset(button.dataset.promptPreset);
+  });
   $('detectorPromptAutoUpdate').checked = initial.detector_prompt_auto_update;
+  $('detectorPromptAutoUpdate').onchange = updatePromptPending;
+  $('selectAllAutoQuestions').onclick = () => setAllAutoQuestions(true);
+  $('clearAllAutoQuestions').onclick = () => setAllAutoQuestions(false);
+  $('autoEnabled').onchange = updateAutoSchedulePending;
+  $('autoInterval').oninput = updateAutoSchedulePending;
+  updateAutoQuestionControls();
+  updateAutoSchedulePending();
 
   const cameras = config.camera_devices || [{
     device: initial.camera_device,
@@ -336,6 +441,8 @@ function populateOperatorControls(config, initial) {
   $('privacyOn').onclick = () => act(() => post('/api/privacy', {enabled: true}), 'Privacy screen activated.');
   $('privacyOff').onclick = () => act(() => post('/api/privacy', {enabled: false}), 'Public camera view restored.');
   $('resetSession').onclick = () => act(() => post('/api/reset'), 'Session reset and generated text cleared.');
+  $('headerPrivacy').onclick = $('privacyOn').onclick;
+  $('headerReset').onclick = $('resetSession').onclick;
   $('detectorOnly').onclick = () => act(() => post('/api/mode', {mode: 'detector-only'}), 'Scene analysis disabled; camera fallback active.');
   $('applyMode').onclick = () => act(async () => {
     await post('/api/replay', {scenario: $('scenarioSelect').value});
@@ -369,6 +476,7 @@ function populateOperatorControls(config, initial) {
   $('applyAuto').onclick = () => act(() => post('/api/auto-analyse', {
     enabled: $('autoEnabled').checked,
     interval_seconds: Number($('autoInterval').value),
+    questions: selectedAutoQuestions(),
   }), 'Automatic schedule updated.');
 }
 

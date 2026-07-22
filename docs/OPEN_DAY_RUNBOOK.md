@@ -16,9 +16,9 @@ SceneChat has no ModelDeck Worker credential. Never copy `MODELDECK_SCENECHAT_AP
 
 In **Operator controls**, select the named camera and, when configured, the allowlisted object detector model. Start the camera and confirm the live image and camera processing rate. Select `modeldeck`, confirm **ModelDeck · scenechat-vision · available**, then select **live**. The no-detector configuration must show no object boxes or detector claims. Detector switching briefly pauses and restarts the camera. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
 
-For YOLOE or YOLO-World, select a small approved prompt set before opening. Enable automatic prompt updates only after confirming that the model's structured object labels remain suitable. The base prompts are restored whenever a new scene analysis does not return additional approved labels; reset continues to clear visitor-facing generated text but does not change the operator's detector configuration.
+For YOLOE or YOLO-World, choose an object preset or a small approved prompt set before opening. Optional scene-analysis updates preserve that active selection and append only exact structured object labels from the approved vocabulary. Reset continues to clear visitor-facing generated text but does not change the operator's detector configuration.
 
-When enabling automatic scene analysis, choose the interval and confirm that successive requests use randomly selected curated questions. The scheduler avoids an immediate repeat when multiple questions are available and pauses while the privacy screen is active.
+When enabling automatic scene analysis, choose its curated question pool and an interval of at least 20 seconds. Confirm that successive requests rotate randomly through that pool. The scheduler avoids an immediate repeat when multiple questions are available and pauses while the privacy screen is active.
 
 ## Between visitors
 

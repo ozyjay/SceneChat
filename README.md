@@ -106,7 +106,9 @@ The script uses temporary partial files and refuses to replace an unrecognised e
 
 Operators can select active prompts from the approved vocabulary for either detector family. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in the model's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
 
-When automatic scene analysis is enabled, each interval randomly selects from the version-controlled curated questions. It avoids immediately repeating the selected question when more than one choice is available. Manual question selection is unchanged, and privacy mode prevents automatic requests.
+When automatic scene analysis is enabled, each interval randomly selects from the operator's chosen pool of version-controlled curated questions. It avoids immediately repeating the selected question when more than one choice is available, enforces a minimum 20-second interval, and pauses in privacy mode. Manual question selection is unchanged.
+
+Optional scene-analysis-driven detector updates preserve the operator's active prompts and append only exact structured object labels that also appear in the approved vocabulary. They never restore default prompts or derive detector prompts from free-form model text.
 
 Do not promote a model backend to Open Day use until the hardware checks in [MODEL_COMPATIBILITY.md](docs/MODEL_COMPATIBILITY.md) pass.
 
