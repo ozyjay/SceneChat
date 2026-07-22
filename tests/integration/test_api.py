@@ -55,13 +55,17 @@ async def test_health_public_state_and_pages():
         assert 'id="autoQuestionChoices"' in public.text
         assert 'id="autoScheduleStatus"' in public.text
         assert 'id="headerPrivacy"' in public.text
-        assert '/assets/styles.css?v=12' in public.text
-        assert '/assets/public.js?v=14' in public.text
+        assert '/assets/styles.css?v=13' in public.text
+        assert '/assets/public.js?v=15' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="detectorPromptSelect"' not in public.text
         assert 'id="analysisStatus"' in public.text
         assert 'id="analysisStatusTitle"' in public.text
         assert 'id="analysisStatusDetail"' in public.text
+        assert 'id="detectorLegend"' in public.text
+        assert 'id="analysisObjects"' in public.text
+        assert 'Scene model mentioned' in public.text
+        assert 'Fast object detector' in public.text
         assert 'id="checkProvider"' in public.text
         assert 'id="providerGuidance"' in public.text
         assert 'id="cameraDevice"' not in public.text

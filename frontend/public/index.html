@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=12">
+  <link rel="stylesheet" href="/assets/styles.css?v=13">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -25,6 +25,7 @@
       <div id="visualFrame" class="visual-frame">
         <img id="sceneImage" src="/api/frame" alt="Current SceneChat scene">
         <div id="detectionLayer" class="detection-layer" aria-hidden="true"></div>
+        <div id="detectorLegend" class="system-legend detector-legend">Teal boxes · fast object detector</div>
         <div id="privacyHolding" class="privacy-holding" hidden>
           <div class="privacy-symbol">◉</div>
           <h2>Camera hidden</h2>
@@ -51,8 +52,20 @@
         <strong>Uncertain details</strong>
         <ul id="uncertainties"></ul>
       </div>
+      <div id="analysisObjectsPanel" class="system-output scene-model-output">
+        <div class="system-output-heading">
+          <h3>Scene model mentioned</h3>
+          <span class="system-badge scene-model-badge">Generated description</span>
+        </div>
+        <p>Structured objects returned with the scene description. These are not detector boxes.</p>
+        <div id="analysisObjects" class="scene-model-objects"><span class="muted">No scene description yet</span></div>
+      </div>
       <div id="objectCountsPanel" class="object-counts">
-        <h3>Object labels</h3>
+        <div class="system-output-heading">
+          <h3>Fast object detector</h3>
+          <span class="system-badge detector-badge">Teal camera boxes</span>
+        </div>
+        <p>Current labels produced continuously by the separate object detector.</p>
         <div id="objectCounts" class="count-chips"><span class="muted">Waiting for detections</span></div>
       </div>
     </aside>
@@ -194,6 +207,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=14" defer></script>
+  <script src="/assets/public.js?v=15" defer></script>
 </body>
 </html>

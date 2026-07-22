@@ -58,6 +58,7 @@ function renderDetections(detections) {
 function renderCounts(detections) {
   if (!state.detectorEnabled) {
     $('detectionSummary').textContent = 'Live camera · object detection off';
+    $('detectorLegend').hidden = true;
     const panel = $('objectCounts');
     panel.replaceChildren();
     const empty = document.createElement('span');
@@ -66,6 +67,7 @@ function renderCounts(detections) {
     panel.append(empty);
     return;
   }
+  $('detectorLegend').hidden = state.current?.privacy_screen;
   const counts = detections.reduce((result, item) => {
     result[item.label] = (result[item.label] || 0) + 1;
     return result;
@@ -88,6 +90,26 @@ function renderCounts(detections) {
     const empty = document.createElement('span');
     empty.className = 'muted';
     empty.textContent = 'No current detections';
+    panel.append(empty);
+  }
+}
+
+function renderAnalysisObjects(analysis) {
+  const panel = $('analysisObjects');
+  panel.replaceChildren();
+  for (const object of analysis?.objects || []) {
+    const chip = document.createElement('span');
+    chip.className = 'scene-model-object';
+    chip.textContent = object.label;
+    chip.title = `${object.description} Location: ${object.approximate_location}`;
+    panel.append(chip);
+  }
+  if (!analysis?.objects?.length) {
+    const empty = document.createElement('span');
+    empty.className = 'muted';
+    empty.textContent = analysis
+      ? 'The scene model did not return any structured objects'
+      : 'No scene description yet';
     panel.append(empty);
   }
 }
@@ -314,6 +336,7 @@ function render(next) {
   renderCounts(next.privacy_screen ? [] : next.detections);
   const analysis = next.scene_analysis;
   renderAnalysisStatus(next, analysis);
+  renderAnalysisObjects(analysis);
   $('sceneSummary').textContent = analysis?.summary
     || (next.analysis_in_progress ? 'Analysing the scene…' : 'Choose a question to generate a scene description.');
   $('analysisTime').textContent = analysis
