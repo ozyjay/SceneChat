@@ -92,11 +92,10 @@ function selectedDetectorPrompts() {
 
 function updateDetectorPromptToggle() {
   const inputs = Array.from(document.querySelectorAll('input[name="detectorPrompt"]'));
-  const allSelected = inputs.length > 0 && inputs.every(input => input.checked);
-  const toggle = $('toggleAllDetectorPrompts');
-  toggle.textContent = allSelected ? 'Deselect all' : 'Select all';
-  toggle.setAttribute('aria-pressed', String(allSelected));
-  toggle.disabled = inputs.length === 0;
+  const selectedCount = inputs.filter(input => input.checked).length;
+  $('detectorPromptSelectionCount').textContent = `${selectedCount} of ${inputs.length} selected`;
+  $('selectAllDetectorPrompts').disabled = inputs.length === 0 || selectedCount === inputs.length;
+  $('clearAllDetectorPrompts').disabled = selectedCount === 0;
 }
 
 function detectorPromptSelectionChanged() {
@@ -104,10 +103,9 @@ function detectorPromptSelectionChanged() {
   updateDetectorPromptToggle();
 }
 
-function toggleAllDetectorPrompts() {
+function setAllDetectorPrompts(checked) {
   const inputs = Array.from(document.querySelectorAll('input[name="detectorPrompt"]'));
-  const selectAll = inputs.some(input => !input.checked);
-  for (const input of inputs) input.checked = selectAll;
+  for (const input of inputs) input.checked = checked;
   detectorPromptSelectionChanged();
 }
 
@@ -132,7 +130,12 @@ function updatePromptPending() {
   const active = new Set(state.current?.detector_prompts || []);
   const selected = selectedDetectorPrompts();
   const changed = selected.length !== active.size || selected.some(prompt => !active.has(prompt));
-  $('detectorPromptPending').hidden = !changed;
+  const pending = $('detectorPromptPending');
+  pending.hidden = !changed;
+  pending.textContent = selected.length
+    ? 'Selection changed — apply prompts to activate it.'
+    : 'Choose at least one object before applying prompts.';
+  $('applyDetectorPrompts').disabled = selected.length === 0;
 }
 
 function renderOperator(next) {
@@ -150,7 +153,8 @@ function renderOperator(next) {
   const activePrompts = next.detector_prompts || [];
   renderActivePrompts(activePrompts);
   const editingDetectorPrompts = document.activeElement?.name === 'detectorPrompt'
-    || document.activeElement === $('toggleAllDetectorPrompts');
+    || document.activeElement === $('selectAllDetectorPrompts')
+    || document.activeElement === $('clearAllDetectorPrompts');
   if (!editingDetectorPrompts) {
     const activeSet = new Set(activePrompts);
     for (const input of document.querySelectorAll('input[name="detectorPrompt"]')) {
@@ -302,7 +306,8 @@ function populateOperatorControls(config, initial) {
   renderActivePrompts(initial.detector_prompts || []);
   updatePromptPending();
   updateDetectorPromptToggle();
-  $('toggleAllDetectorPrompts').onclick = toggleAllDetectorPrompts;
+  $('selectAllDetectorPrompts').onclick = () => setAllDetectorPrompts(true);
+  $('clearAllDetectorPrompts').onclick = () => setAllDetectorPrompts(false);
   $('detectorPromptAutoUpdate').checked = initial.detector_prompt_auto_update;
 
   const cameras = config.camera_devices || [{

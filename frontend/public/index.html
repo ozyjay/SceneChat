@@ -103,13 +103,19 @@
         <div id="detectorPromptControls" hidden>
           <fieldset class="prompt-options">
             <legend>Objects to detect</legend>
-            <button id="toggleAllDetectorPrompts" class="prompt-toggle-all" type="button">Select all</button>
+            <div class="prompt-selection-toolbar">
+              <span id="detectorPromptSelectionCount" aria-live="polite">0 selected</span>
+              <div class="prompt-selection-actions">
+                <button id="selectAllDetectorPrompts" type="button">Select all</button>
+                <button id="clearAllDetectorPrompts" type="button">Clear all</button>
+              </div>
+            </div>
             <div id="detectorPromptChoices" class="prompt-choices"></div>
           </fieldset>
           <div class="active-prompt-summary">
             <strong>Currently active</strong>
             <div id="activePromptChips" class="active-prompt-chips"></div>
-            <p id="detectorPromptPending" class="pending-change" hidden>Selection changed — apply prompts to activate it.</p>
+            <p id="detectorPromptPending" class="pending-change" hidden></p>
           </div>
           <label class="check-label"><input id="detectorPromptAutoUpdate" type="checkbox"> Add approved objects after each scene description</label>
           <button id="applyDetectorPrompts" class="secondary-button">Apply object prompts</button>
