@@ -6,6 +6,7 @@ from scenechat.models import AppState, Detection, SceneAnalysis
 from scenechat.services.analysis import AnalysisService
 from scenechat.services.analysis import AnalysisBusy
 from scenechat.services.state import StateStore
+from scenechat.main import _automatic_analysis_can_run
 
 
 class ControlledProvider:
@@ -22,6 +23,20 @@ class ControlledProvider:
         self.started.set()
         await self.release.wait()
         return SceneAnalysis(summary="A result that became stale.", provider=self.name)
+
+
+def test_automatic_analysis_requires_a_running_camera():
+    active = AppState(
+        auto_analyse=True,
+        camera_running=True,
+        internal_mode="live",
+        privacy_screen=False,
+    )
+
+    assert _automatic_analysis_can_run(active) is True
+    assert _automatic_analysis_can_run(
+        active.model_copy(update={"camera_running": False})
+    ) is False
 
 
 @pytest.mark.anyio

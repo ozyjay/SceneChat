@@ -315,9 +315,13 @@ function renderOperator(next) {
     }
   }
   const questionCount = next.auto_analyse_questions?.length || 0;
-  $('autoScheduleStatus').textContent = next.auto_analyse
-    ? `Automatic analysis on · every ${next.auto_analyse_interval_seconds} seconds · ${questionCount} questions in rotation`
-    : 'Automatic analysis is off';
+  if (next.auto_analyse && !next.camera_running) {
+    $('autoScheduleStatus').textContent = `Automatic analysis paused · start the camera to resume the ${next.auto_analyse_interval_seconds}-second schedule`;
+  } else {
+    $('autoScheduleStatus').textContent = next.auto_analyse
+      ? `Automatic analysis on · every ${next.auto_analyse_interval_seconds} seconds · ${questionCount} questions in rotation`
+      : 'Automatic analysis is off';
+  }
   updateAutoQuestionControls();
   updateAutoSchedulePending();
   const providerName = next.provider === 'modeldeck' ? 'ModelDeck · scenechat-vision' : next.provider;
@@ -405,10 +409,15 @@ function render(next) {
     button.classList.toggle('active', button.dataset.question === next.selected_question);
   });
   $('questionButtons').hidden = next.auto_analyse;
-  $('questionsTitle').textContent = next.auto_analyse ? 'Automatic questions are running' : 'Choose a question';
-  $('questionModeHint').textContent = next.auto_analyse
-    ? `SceneChat randomly rotates through ${next.auto_analyse_questions.length} curated questions every ${next.auto_analyse_interval_seconds} seconds.`
-    : 'Select a prepared question to analyse the current scene.';
+  if (next.auto_analyse && !next.camera_running) {
+    $('questionsTitle').textContent = 'Automatic questions are paused';
+    $('questionModeHint').textContent = 'Start the camera to restart the automatic analysis countdown.';
+  } else {
+    $('questionsTitle').textContent = next.auto_analyse ? 'Automatic questions are running' : 'Choose a question';
+    $('questionModeHint').textContent = next.auto_analyse
+      ? `SceneChat randomly rotates through ${next.auto_analyse_questions.length} curated questions every ${next.auto_analyse_interval_seconds} seconds.`
+      : 'Select a prepared question to analyse the current scene.';
+  }
   $('triggerAnalysis').disabled = next.analysis_in_progress
     || next.internal_mode === 'detector-only'
     || next.privacy_screen;
@@ -549,11 +558,14 @@ function populateOperatorControls(config, initial) {
     return post('/api/camera/start', {device: Number(selected.value)});
   }, result => {
     const label = state.cameraLabels.get(String(result.camera_device)) || `Camera ${result.camera_device}`;
-    return `${label} started. Fast object detection is using ${result.detector_model || result.detector_backend}.`;
+    const automatic = result.auto_analyse
+      ? ` Automatic scene analysis resumed; the next run is scheduled in ${result.auto_analyse_interval_seconds} seconds.`
+      : '';
+    return `${label} started. Fast object detection is using ${result.detector_model || result.detector_backend}.${automatic}`;
   });
   $('stopCamera').onclick = () => act(
     () => post('/api/camera/stop'),
-    'Camera stopped. Live frames and continuous object detection are no longer running; replay remains available.',
+    result => `Camera stopped. Live frames and continuous object detection are no longer running.${result.auto_analyse ? ' Automatic scene analysis is paused until the camera starts again.' : ''} Replay remains available.`,
   );
   $('applyDetectorModel').onclick = () => act(
     () => post('/api/detector/model', {model: $('detectorModelSelect').value}),
@@ -597,9 +609,15 @@ function populateOperatorControls(config, initial) {
     enabled: $('autoEnabled').checked,
     interval_seconds: Number($('autoInterval').value),
     questions: selectedAutoQuestions(),
-  }), result => result.auto_analyse
-    ? `Automatic scene analysis enabled. ${result.auto_analyse_questions.length} curated questions will rotate every ${result.auto_analyse_interval_seconds} seconds.`
-    : 'Automatic scene analysis disabled. Curated questions remain available for manual runs.');
+  }), result => {
+    if (!result.auto_analyse) {
+      return 'Automatic scene analysis disabled. Curated questions remain available for manual runs.';
+    }
+    if (!result.camera_running) {
+      return `Automatic scene analysis configured for every ${result.auto_analyse_interval_seconds} seconds, but paused because the camera is stopped. It will resume after the camera starts.`;
+    }
+    return `Automatic scene analysis enabled. ${result.auto_analyse_questions.length} curated questions will rotate every ${result.auto_analyse_interval_seconds} seconds.`;
+  });
 }
 
 async function updateHealth() {

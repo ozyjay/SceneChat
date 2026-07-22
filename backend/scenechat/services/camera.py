@@ -136,12 +136,6 @@ class CameraService:
 
     async def stop(self) -> None:
         self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=3)
-        self._thread = None
-        with self._frame_lock:
-            self._latest_jpeg = None
-            self._latest_detections = []
         await self.state.mutate(
             lambda state: (
                 setattr(state, "camera_running", False),
@@ -149,6 +143,12 @@ class CameraService:
                 setattr(state, "detections", []),
             )
         )
+        if self._thread:
+            self._thread.join(timeout=3)
+        self._thread = None
+        with self._frame_lock:
+            self._latest_jpeg = None
+            self._latest_detections = []
 
     def _capture_loop(self, device: int) -> None:
         import cv2

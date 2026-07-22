@@ -56,7 +56,7 @@ async def test_health_public_state_and_pages():
         assert 'id="autoScheduleStatus"' in public.text
         assert 'id="headerPrivacy"' in public.text
         assert '/assets/styles.css?v=14' in public.text
-        assert '/assets/public.js?v=17' in public.text
+        assert '/assets/public.js?v=18' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="learnedPromptChips"' in public.text
         assert 'id="clearLearnedPrompts"' in public.text
@@ -80,8 +80,10 @@ async def test_health_public_state_and_pages():
         assert health.json()["status"] == "ok"
         assert (await client.get("/api/diagnostics")).status_code == 200
         assert (await client.get("/api/frame")).status_code == 200
-        script = await client.get("/assets/public.js?v=17")
+        script = await client.get("/assets/public.js?v=18")
         assert "Automatic scene analysis enabled" in script.text
+        assert "Automatic analysis paused" in script.text
+        assert "Automatic scene analysis is paused until the camera starts again" in script.text
         assert "Object detection updated" in script.text
         assert "Privacy screen activated" in script.text
 

@@ -829,7 +829,16 @@ async def _camera_monitor(camera: CameraService, state: StateStore) -> None:
                     setattr(app_state, "detections", current[0]),
                     setattr(app_state, "detector_fps", current[1]),
                 )
-            )
+                )
+
+
+def _automatic_analysis_can_run(state: AppState) -> bool:
+    return (
+        state.auto_analyse
+        and state.camera_running
+        and state.internal_mode != "detector-only"
+        and not state.privacy_screen
+    )
 
 
 async def _automatic_analysis(app: FastAPI) -> None:
@@ -838,11 +847,7 @@ async def _automatic_analysis(app: FastAPI) -> None:
     while True:
         await asyncio.sleep(0.5)
         state = await app.state.state_store.snapshot()
-        if (
-            not state.auto_analyse
-            or state.internal_mode == "detector-only"
-            or state.privacy_screen
-        ):
+        if not _automatic_analysis_can_run(state):
             last_started = loop.time()
             continue
         if loop.time() - last_started < state.auto_analyse_interval_seconds:
@@ -850,7 +855,10 @@ async def _automatic_analysis(app: FastAPI) -> None:
         last_started = loop.time()
         image = app.state.camera.latest_jpeg()
         if not image:
-            image = app.state.registry.image_path(state.replay_scenario).read_bytes()
+            # Camera state can change after the scheduler snapshot. Never replace a
+            # missing live frame with replay content for an automatic request.
+            last_started = loop.time()
+            continue
         try:
             question = _select_automatic_question(
                 state.auto_analyse_questions, state.selected_question

@@ -18,7 +18,7 @@ In **Operator controls**, select the named camera and, when configured, the allo
 
 For YOLOE or YOLO-World, choose an object preset or a small approved prompt set before opening. This becomes the protected operator baseline. If **Learn safe objects from scene analysis this session** is enabled, structured object labels may be appended automatically after conservative filtering, including labels outside the manual allowlist. Review the separate operator-selected and scene-learned lists and their aggregate blocked/capacity counts. Use **Clear learned objects** to retain the scene description while restoring the baseline. **Reset session** also clears learned objects and counters while preserving the latest operator baseline.
 
-When enabling automatic scene analysis, choose its curated question pool and an interval of at least 20 seconds. Confirm that successive requests rotate randomly through that pool. The scheduler avoids an immediate repeat when multiple questions are available and pauses while the privacy screen is active.
+When enabling automatic scene analysis, choose its curated question pool and an interval of at least 20 seconds. Confirm that successive requests rotate randomly through that pool. The scheduler avoids an immediate repeat when multiple questions are available and pauses while the camera is stopped or the privacy screen is active. Starting the camera resumes the schedule with a fresh interval countdown.
 
 ## Between visitors
 
