@@ -16,13 +16,13 @@ SceneChat has no ModelDeck Worker credential. Never copy `MODELDECK_SCENECHAT_AP
 
 In **Operator controls**, select the named camera and, when configured, the allowlisted object detector model. Start the camera and confirm the live image and camera processing rate. Select `modeldeck`, confirm **ModelDeck · scenechat-vision · available**, then select **live**. The no-detector configuration must show no object boxes or detector claims. Detector switching briefly pauses and restarts the camera. Do not troubleshoot in front of a visitor for more than 30 seconds; explicitly switch to fallback instead.
 
-For YOLOE or YOLO-World, choose an object preset or a small approved prompt set before opening. Optional scene-analysis updates preserve that active selection and append only exact structured object labels from the approved vocabulary. Reset continues to clear visitor-facing generated text but does not change the operator's detector configuration.
+For YOLOE or YOLO-World, choose an object preset or a small approved prompt set before opening. This becomes the protected operator baseline. If **Learn safe objects from scene analysis this session** is enabled, structured object labels may be appended automatically after conservative filtering, including labels outside the manual allowlist. Review the separate operator-selected and scene-learned lists and their aggregate blocked/capacity counts. Use **Clear learned objects** to retain the scene description while restoring the baseline. **Reset session** also clears learned objects and counters while preserving the latest operator baseline.
 
 When enabling automatic scene analysis, choose its curated question pool and an interval of at least 20 seconds. Confirm that successive requests rotate randomly through that pool. The scheduler avoids an immediate repeat when multiple questions are available and pauses while the privacy screen is active.
 
 ## Between visitors
 
-Select **Reset session**. Confirm the public description is cleared. Reset must complete within five seconds and no prior generated text should return.
+Select **Reset session**. Confirm the public description and scene-learned detector objects are cleared and the operator baseline is active. Reset must complete within five seconds and no prior generated text or stale learned object should return.
 
 ## Fallbacks
 

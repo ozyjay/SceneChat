@@ -2,6 +2,7 @@
 
 import asyncio
 
+from scenechat.detection.prompt_learning import sanitise_scene_analysis
 from scenechat.services.state import StateStore
 from scenechat.vision.base import VisionLanguageProvider, VisionProviderError
 
@@ -45,6 +46,7 @@ class AnalysisService:
                 analysis = await asyncio.wait_for(
                     provider.analyse_scene(image, question), timeout=self.timeout
                 )
+                analysis = sanitise_scene_analysis(analysis)
                 applied = await self.state.set_analysis(analysis, generation)
                 return analysis, applied
             except Exception as exc:

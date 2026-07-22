@@ -34,6 +34,11 @@ class StateStore:
             state.analysis_in_progress = False
             state.last_model_latency_ms = None
             state.staff_error = None
+            state.detector_prompts = list(state.detector_prompt_baseline)
+            state.detector_learned_prompts = []
+            state.detector_prompt_safety_rejections = 0
+            state.detector_prompt_rejection_reasons = {}
+            state.detector_prompt_capacity_skips = 0
 
         return await self.mutate(change)
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=13">
+  <link rel="stylesheet" href="/assets/styles.css?v=14">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -172,13 +172,21 @@
             <div id="detectorPromptChoices" class="prompt-choices"></div>
           </fieldset>
           <div class="active-prompt-summary">
-            <strong>Currently active</strong>
+            <strong>Operator-selected baseline</strong>
             <div id="activePromptChips" class="active-prompt-chips"></div>
             <p id="detectorPromptPending" class="pending-change" hidden></p>
           </div>
-          <label class="check-label"><input id="detectorPromptAutoUpdate" type="checkbox"> Add approved objects found by scene analysis</label>
+          <div class="learned-prompt-summary">
+            <div class="learned-prompt-heading">
+              <strong>Learned from scene analysis</strong>
+              <button id="clearLearnedPrompts" class="secondary-button" type="button">Clear learned objects</button>
+            </div>
+            <div id="learnedPromptChips" class="active-prompt-chips"></div>
+            <p id="promptLearningStatus" class="prompt-learning-status"></p>
+          </div>
+          <label class="check-label"><input id="detectorPromptAutoUpdate" type="checkbox"> Learn safe objects from scene analysis this session</label>
           <button id="applyDetectorPrompts" class="primary-button">Apply object detection changes</button>
-          <p>Only structured object labels matching the approved list are added. Your active choices are preserved.</p>
+          <p>New structured object labels are added automatically after conservative safety filtering. Learned objects are removed by Reset session or app restart; the operator baseline is never evicted.</p>
         </div>
       </section>
 
@@ -207,6 +215,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=16" defer></script>
+  <script src="/assets/public.js?v=17" defer></script>
 </body>
 </html>

@@ -81,7 +81,7 @@ Invalid application ports and ModelDeck management, legacy direct-model, non-loo
 
 Image dimensions, encoded byte counts, resize duration, total provider latency and the request outcome are logged for successful and timed-out ModelDeck analysis requests. These diagnostics never include image or base64 data, prompts, or visitor-derived descriptions. Pixel resizing primarily changes transport size and does not imply an inference-latency improvement. The mock Worker owns the Qwen3.5 processor configuration and uses the selected 280-visual-token budget; SceneChat sends no visual-token setting.
 
-SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same approved object vocabulary. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for switching; the browser receives identifiers rather than paths:
+SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same operator-selected baseline. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for model switching and manual prompt selection; the browser receives identifiers rather than paths:
 
 ```env
 DETECTOR_BACKEND=auto
@@ -104,11 +104,11 @@ pwsh -NoProfile -File scripts/download.ps1
 
 The script uses temporary partial files and refuses to replace an unrecognised existing file. SceneChat validates local files and never downloads weights during `run.ps1`.
 
-Operators can select active prompts from the approved vocabulary for either detector family. When automatic prompt updates are enabled, a completed scene description adds only exact object labels returned in the model's structured `objects` list that also appear in that vocabulary. Free-form model text never becomes a detector prompt.
+Operators select a protected baseline from the configured vocabulary for either detector family. When **Learn safe objects from scene analysis this session** is enabled, exact labels from the model's structured `objects` list may be appended even when they are not in the manual allowlist. A deterministic conservative filter inspects each label and description, blocks malformed, human-descriptive, sensitive, medical, intimate, weapon and substance-related candidates, and reports only aggregate rejection categories. Model safety notes block all candidates from that response. Summaries and other free-form text never become detector prompts.
+
+The active limit is 20 prompts. Baseline prompts are never evicted; the oldest learned prompt is replaced when needed, or learning is skipped when the baseline fills the limit. Manual application clears learned prompts. Learned prompts are held only in memory, work with both YOLOE and YOLO-World, survive detector switching, and are removed by **Clear learned objects**, **Reset session**, or app restart.
 
 When automatic scene analysis is enabled, each interval randomly selects from the operator's chosen pool of version-controlled curated questions. It avoids immediately repeating the selected question when more than one choice is available, enforces a minimum 20-second interval, and pauses in privacy mode. Manual question selection is unchanged.
-
-Optional scene-analysis-driven detector updates preserve the operator's active prompts and append only exact structured object labels that also appear in the approved vocabulary. They never restore default prompts or derive detector prompts from free-form model text.
 
 Do not promote a model backend to Open Day use until the hardware checks in [MODEL_COMPATIBILITY.md](docs/MODEL_COMPATIBILITY.md) pass.
 
@@ -118,7 +118,7 @@ Do not promote a model backend to Open Day use until the hardware checks in [MOD
 - Explicitly choose the `fallback` or `replay` provider and replay mode when a live model is not wanted.
 - Use replay if the camera or ModelDeck is unavailable; it needs neither service.
 - Use **Hide camera now** for an immediate privacy holding screen.
-- Use **Reset session** between visitors; it clears generated text and makes in-flight responses stale.
+- Use **Reset session** between visitors; it clears generated text and learned detector prompts, restores the operator baseline, and makes in-flight responses stale.
 
 ## ModelDeck and SceneChat start-up
 

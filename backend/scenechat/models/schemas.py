@@ -66,6 +66,17 @@ class SceneAnalysis(SceneAnalysisPayload):
     prompt_tokens: int | None = Field(default=None, ge=0)
     completion_tokens: int | None = Field(default=None, ge=0)
     completion_token_limit: int | None = Field(default=None, ge=1)
+    prompt_rejection_reasons: dict[str, int] = Field(
+        default_factory=dict, exclude=True, repr=False
+    )
+
+
+class PromptLearningOutcome(BaseModel):
+    added: list[str] = Field(default_factory=list)
+    evicted: list[str] = Field(default_factory=list)
+    rejected_count: int = Field(default=0, ge=0)
+    rejection_reasons: dict[str, int] = Field(default_factory=dict)
+    capacity_skipped_count: int = Field(default=0, ge=0)
 
 
 class AppState(BaseModel):
@@ -83,7 +94,12 @@ class AppState(BaseModel):
     detector_backend: str = "replay"
     detector_model: str | None = None
     detector_prompts: list[str] = Field(default_factory=list)
+    detector_prompt_baseline: list[str] = Field(default_factory=list)
+    detector_learned_prompts: list[str] = Field(default_factory=list)
     detector_prompt_auto_update: bool = False
+    detector_prompt_safety_rejections: int = 0
+    detector_prompt_rejection_reasons: dict[str, int] = Field(default_factory=dict)
+    detector_prompt_capacity_skips: int = 0
     replay_scenario: str = "demo_booth"
     detections: list[Detection] = Field(default_factory=list)
     scene_analysis: SceneAnalysis | None = None

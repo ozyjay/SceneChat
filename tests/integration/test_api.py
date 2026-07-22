@@ -7,7 +7,7 @@ import scenechat.main as main_module
 from scenechat.config import Settings
 from scenechat.detection import NoopDetector
 from scenechat.main import create_app
-from scenechat.models import SceneAnalysis
+from scenechat.models import ObjectDescription, SceneAnalysis
 from scenechat.vision.base import ProviderStatus
 
 
@@ -55,9 +55,12 @@ async def test_health_public_state_and_pages():
         assert 'id="autoQuestionChoices"' in public.text
         assert 'id="autoScheduleStatus"' in public.text
         assert 'id="headerPrivacy"' in public.text
-        assert '/assets/styles.css?v=13' in public.text
-        assert '/assets/public.js?v=16' in public.text
+        assert '/assets/styles.css?v=14' in public.text
+        assert '/assets/public.js?v=17' in public.text
         assert 'id="activePromptChips"' in public.text
+        assert 'id="learnedPromptChips"' in public.text
+        assert 'id="clearLearnedPrompts"' in public.text
+        assert 'id="promptLearningStatus"' in public.text
         assert 'id="detectorPromptSelect"' not in public.text
         assert 'id="analysisStatus"' in public.text
         assert 'id="analysisStatusTitle"' in public.text
@@ -77,7 +80,7 @@ async def test_health_public_state_and_pages():
         assert health.json()["status"] == "ok"
         assert (await client.get("/api/diagnostics")).status_code == 200
         assert (await client.get("/api/frame")).status_code == 200
-        script = await client.get("/assets/public.js?v=16")
+        script = await client.get("/assets/public.js?v=17")
         assert "Automatic scene analysis enabled" in script.text
         assert "Object detection updated" in script.text
         assert "Privacy screen activated" in script.text
@@ -312,7 +315,13 @@ async def test_modeldeck_unavailable_at_startup_keeps_offline_app_operational(mo
 
 @pytest.mark.anyio
 async def test_operator_can_switch_only_allowlisted_detector_models(monkeypatch):
-    monkeypatch.setattr(main_module, "create_detector", lambda settings: NoopDetector())
+    created_with_prompts = []
+
+    def create_detector(settings):
+        created_with_prompts.append(list(settings.detector_prompts))
+        return NoopDetector()
+
+    monkeypatch.setattr(main_module, "create_detector", create_detector)
     settings = Settings(
         _env_file=None,
         scenechat_mode="live",
@@ -356,6 +365,9 @@ async def test_operator_can_switch_only_allowlisted_detector_models(monkeypatch)
             lambda state: (
                 setattr(state, "camera_running", True),
                 setattr(state, "camera_device", 4),
+                setattr(state, "detector_prompt_baseline", ["person"]),
+                setattr(state, "detector_learned_prompts", ["tripod"]),
+                setattr(state, "detector_prompts", ["person", "tripod"]),
             )
         )
         config = (await client.get("/api/config")).json()
@@ -366,6 +378,10 @@ async def test_operator_can_switch_only_allowlisted_detector_models(monkeypatch)
         switched = await client.post("/api/detector/model", json={"model": "yoloe-26s"})
         assert switched.status_code == 200
         assert switched.json()["detector_model"] == "yoloe-26s"
+        assert switched.json()["detector_prompt_baseline"] == ["person"]
+        assert switched.json()["detector_learned_prompts"] == ["tripod"]
+        assert switched.json()["detector_prompts"] == ["person", "tripod"]
+        assert created_with_prompts[-1] == ["person", "tripod"]
         assert switched.json()["camera_running"] is True
         assert lifecycle_calls == ["stop", "start:4"]
         rejected = await client.post(
@@ -417,6 +433,8 @@ async def test_yoloe_prompts_are_operator_approved(monkeypatch):
         )
         assert accepted.status_code == 200
         assert accepted.json()["detector_prompts"] == ["person", "camera"]
+        assert accepted.json()["detector_prompt_baseline"] == ["person", "camera"]
+        assert accepted.json()["detector_learned_prompts"] == []
         assert accepted.json()["detector_prompt_auto_update"] is True
         assert applied == [["person", "camera"]]
 
@@ -430,15 +448,326 @@ async def test_yoloe_prompts_are_operator_approved(monkeypatch):
         await lifespan.__aexit__(None, None, None)
 
 
-def test_model_labels_extend_active_prompts_without_restoring_defaults():
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("backend", "model", "extra"),
+    [
+        (
+            "yoloe",
+            "/models/yoloe-26s-seg.pt",
+            {"detector_text_encoder": "/models/mobileclip2_b.ts"},
+        ),
+        (
+            "yoloworld",
+            "/models/yolov8s-worldv2.pt",
+            {"detector_yoloworld_clip": "/models/ViT-B-32.pt"},
+        ),
+    ],
+)
+async def test_scene_analysis_learns_safe_objects_for_both_promptable_detectors(
+    monkeypatch, backend, model, extra
+):
+    monkeypatch.setattr(main_module, "create_detector", lambda settings: NoopDetector())
     settings = Settings(
         _env_file=None,
-        detector_prompts=["person", "computer mouse"],
-        detector_prompt_allowlist=["person", "computer mouse", "camera"],
+        scenechat_mode="live",
+        model_provider="mock",
+        detector_backend=backend,
+        detector_model=model,
+        detector_prompts=["person"],
+        detector_prompt_allowlist=["person", "camera"],
+        detector_prompt_auto_update=True,
+        **extra,
+    )
+    app = create_app(settings)
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
     )
 
-    assert main_module._approved_detector_prompts(
-        settings,
-        ["computer mouse"],
-        ["Camera", "red-haired person", "a black computer mouse"],
-    ) == ["computer mouse", "camera"]
+    class LearningProvider:
+        name = "mock"
+
+        async def health(self):
+            return ProviderStatus(True, "available", "Provider is available.")
+
+        async def analyse_scene(self, image, question):
+            return SceneAnalysis(
+                summary="A tripod and wheelchair are visible.",
+                objects=[
+                    ObjectDescription(
+                        label="tripod",
+                        description="A tripod is visible.",
+                        approximate_location="centre",
+                    ),
+                    ObjectDescription(
+                        label="wheelchair",
+                        description="A wheelchair is visible.",
+                        approximate_location="left",
+                    ),
+                ],
+                relationships=["The wheelchair is beside the tripod."],
+                provider=self.name,
+            )
+
+    provider = LearningProvider()
+    app.state.providers["mock"] = provider
+    app.state.analysis.providers["mock"] = provider
+    applied = []
+    monkeypatch.setattr(
+        app.state.camera,
+        "set_detector_prompts",
+        lambda prompts: applied.append(list(prompts)),
+    )
+    try:
+        response = await client.post(
+            "/api/analyse", json={"question": "Describe the scene."}
+        )
+        assert response.status_code == 200
+        learning = response.json()["prompt_learning"]
+        assert learning["added"] == ["tripod"]
+        assert learning["rejected_count"] == 1
+        assert learning["rejection_reasons"] == {"medical_or_assistive": 1}
+        assert "wheelchair" not in response.text
+
+        state = (await client.get("/api/state")).json()
+        assert state["detector_prompt_baseline"] == ["person"]
+        assert state["detector_learned_prompts"] == ["tripod"]
+        assert state["detector_prompts"] == ["person", "tripod"]
+        assert state["detector_prompt_safety_rejections"] == 1
+        assert "wheelchair" not in str(state)
+        assert applied == [["person", "tripod"]]
+
+        manually_applied = await client.post(
+            "/api/detector/prompts",
+            json={"prompts": ["person", "camera"], "auto_update": True},
+        )
+        assert manually_applied.status_code == 200
+        assert manually_applied.json()["detector_prompt_baseline"] == [
+            "person",
+            "camera",
+        ]
+        assert manually_applied.json()["detector_learned_prompts"] == []
+
+        await client.post(
+            "/api/analyse", json={"question": "Describe the scene."}
+        )
+        cleared = await client.post("/api/detector/learned/clear")
+        assert cleared.status_code == 200
+        assert cleared.json()["scene_analysis"] is not None
+        assert cleared.json()["detector_prompts"] == ["person", "camera"]
+        assert cleared.json()["detector_learned_prompts"] == []
+        assert applied[-1] == ["person", "camera"]
+
+        await client.post(
+            "/api/analyse", json={"question": "Describe the scene."}
+        )
+        reset = await client.post("/api/reset")
+        assert reset.status_code == 200
+        assert reset.json()["scene_analysis"] is None
+        assert reset.json()["detector_prompts"] == ["person", "camera"]
+        assert reset.json()["detector_learned_prompts"] == []
+        assert reset.json()["detector_prompt_safety_rejections"] == 0
+        assert reset.json()["detector_prompt_rejection_reasons"] == {}
+        assert applied[-1] == ["person", "camera"]
+    finally:
+        await client.aclose()
+        await lifespan.__aexit__(None, None, None)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("invalidation", ["privacy", "reset"])
+async def test_invalidated_analysis_cannot_change_detector_prompts(
+    monkeypatch, invalidation
+):
+    monkeypatch.setattr(main_module, "create_detector", lambda settings: NoopDetector())
+    settings = Settings(
+        _env_file=None,
+        scenechat_mode="live",
+        model_provider="mock",
+        detector_backend="yoloe",
+        detector_model="/models/yoloe-26s-seg.pt",
+        detector_text_encoder="/models/mobileclip2_b.ts",
+        detector_prompts=["person"],
+        detector_prompt_allowlist=["person"],
+        detector_prompt_auto_update=True,
+    )
+    app = create_app(settings)
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+    concurrent_client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+
+    class Provider:
+        async def analyse_scene(self, image, question):
+            return SceneAnalysis(
+                summary="A tripod and wheelchair are visible.",
+                objects=[
+                    ObjectDescription(
+                        label="tripod",
+                        description="A tripod is visible.",
+                        approximate_location="centre",
+                    ),
+                    ObjectDescription(
+                        label="wheelchair",
+                        description="A wheelchair is visible.",
+                        approximate_location="left",
+                    ),
+                ],
+                provider="mock",
+            )
+
+    app.state.providers["mock"] = Provider()
+    app.state.analysis.providers["mock"] = app.state.providers["mock"]
+    prompt_update_started = asyncio.Event()
+    release_prompt_update = asyncio.Event()
+    applied = []
+
+    async def block_first_prompt_update(app, prompts):
+        applied.append(list(prompts))
+        if prompts == ["person", "tripod"]:
+            prompt_update_started.set()
+            await release_prompt_update.wait()
+
+    monkeypatch.setattr(
+        main_module, "_set_detector_prompts", block_first_prompt_update
+    )
+    try:
+        analysis_task = asyncio.create_task(
+            client.post("/api/analyse", json={"question": "Describe the scene."})
+        )
+        await asyncio.wait_for(prompt_update_started.wait(), 2)
+        assert "wheelchair" not in str(
+            (await app.state.state_store.snapshot()).model_dump()
+        )
+
+        if invalidation == "privacy":
+            invalidation_task = asyncio.create_task(
+                concurrent_client.post("/api/privacy", json={"enabled": True})
+            )
+            invalidated = await invalidation_task
+            assert invalidated.status_code == 200
+        else:
+            invalidation_task = asyncio.create_task(
+                concurrent_client.post("/api/reset")
+            )
+            for _ in range(100):
+                if (await app.state.state_store.snapshot()).scene_analysis is None:
+                    break
+                await asyncio.sleep(0.01)
+            assert (await app.state.state_store.snapshot()).scene_analysis is None
+
+        release_prompt_update.set()
+        response = await analysis_task
+        if invalidation == "reset":
+            assert (await invalidation_task).status_code == 200
+
+        assert response.status_code == 200
+        assert response.json()["prompt_learning"]["added"] == []
+        state = (await client.get("/api/state")).json()
+        assert state["detector_prompts"] == ["person"]
+        assert state["detector_learned_prompts"] == []
+        assert applied[0] == ["person", "tripod"]
+        assert applied[-1] == ["person"]
+    finally:
+        release_prompt_update.set()
+        await concurrent_client.aclose()
+        await client.aclose()
+        await lifespan.__aexit__(None, None, None)
+
+
+@pytest.mark.anyio
+async def test_newer_analysis_prevents_an_older_result_learning(monkeypatch):
+    monkeypatch.setattr(main_module, "create_detector", lambda settings: NoopDetector())
+    settings = Settings(
+        _env_file=None,
+        scenechat_mode="live",
+        model_provider="mock",
+        detector_backend="yoloe",
+        detector_model="/models/yoloe-26s-seg.pt",
+        detector_text_encoder="/models/mobileclip2_b.ts",
+        detector_prompts=["person"],
+        detector_prompt_allowlist=["person"],
+        detector_prompt_auto_update=True,
+    )
+    app = create_app(settings)
+    lifespan = app.router.lifespan_context(app)
+    await lifespan.__aenter__()
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+    concurrent_client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    )
+
+    class Provider:
+        calls = 0
+
+        async def analyse_scene(self, image, question):
+            self.calls += 1
+            label = "tripod" if self.calls == 1 else "whiteboard"
+            return SceneAnalysis(
+                summary="An object is visible.",
+                objects=[
+                    ObjectDescription(
+                        label=label,
+                        description=f"A {label} is visible.",
+                        approximate_location="centre",
+                    )
+                ],
+                provider="mock",
+            )
+
+    app.state.providers["mock"] = Provider()
+    app.state.analysis.providers["mock"] = app.state.providers["mock"]
+    first_update_started = asyncio.Event()
+    release_first_update = asyncio.Event()
+    applied = []
+
+    async def block_first_prompt_update(app, prompts):
+        applied.append(list(prompts))
+        if prompts == ["person", "tripod"]:
+            first_update_started.set()
+            await release_first_update.wait()
+
+    monkeypatch.setattr(
+        main_module, "_set_detector_prompts", block_first_prompt_update
+    )
+    try:
+        first = asyncio.create_task(
+            client.post("/api/analyse", json={"question": "Describe the scene."})
+        )
+        await asyncio.wait_for(first_update_started.wait(), 2)
+        second = asyncio.create_task(
+            concurrent_client.post(
+                "/api/analyse", json={"question": "Describe the scene."}
+            )
+        )
+        for _ in range(100):
+            current = await app.state.state_store.snapshot()
+            if current.scene_analysis and current.scene_analysis.objects[0].label == "whiteboard":
+                break
+            await asyncio.sleep(0.01)
+        release_first_update.set()
+
+        first_response, second_response = await asyncio.gather(first, second)
+        assert first_response.json()["prompt_learning"]["added"] == []
+        assert second_response.json()["prompt_learning"]["added"] == ["whiteboard"]
+        state = (await client.get("/api/state")).json()
+        assert state["detector_prompts"] == ["person", "whiteboard"]
+        assert state["detector_learned_prompts"] == ["whiteboard"]
+        assert applied == [
+            ["person", "tripod"],
+            ["person"],
+            ["person", "whiteboard"],
+        ]
+    finally:
+        release_first_update.set()
+        await concurrent_client.aclose()
+        await client.aclose()
+        await lifespan.__aexit__(None, None, None)

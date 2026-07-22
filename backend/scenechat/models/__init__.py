@@ -5,6 +5,7 @@ from .schemas import (
     Detection,
     HealthStatus,
     ObjectDescription,
+    PromptLearningOutcome,
     SceneAnalysis,
     SceneAnalysisPayload,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "Detection",
     "HealthStatus",
     "ObjectDescription",
+    "PromptLearningOutcome",
     "SceneAnalysis",
     "SceneAnalysisPayload",
 ]

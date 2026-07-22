@@ -5,6 +5,7 @@ import json
 import mimetypes
 import random
 import resource
+from collections import Counter
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Annotated
@@ -30,7 +31,14 @@ from scenechat.config import (
     get_settings,
 )
 from scenechat.detection import create_detector
-from scenechat.models import AppState, Detection, HealthStatus
+from scenechat.detection.prompt_learning import plan_prompt_learning
+from scenechat.models import (
+    AppState,
+    Detection,
+    HealthStatus,
+    PromptLearningOutcome,
+    SceneAnalysis,
+)
 from scenechat.replay import ReplayRegistry
 from scenechat.services.analysis import AnalysisBusy, AnalysisService
 from scenechat.services.camera import CameraService, CameraUnavailable, discover_camera_devices
@@ -119,22 +127,7 @@ def _select_automatic_question(questions: list[str], current: str) -> str:
     return random.choice(candidates)
 
 
-def _approved_detector_prompts(
-    configured: Settings, active_prompts: list[str], labels: list[str]
-) -> list[str]:
-    approved = {item.casefold(): item for item in configured.detector_prompt_allowlist}
-    selected = list(active_prompts)
-    for label in labels:
-        normalised = " ".join(label.strip().lower().split())
-        canonical = approved.get(normalised.casefold())
-        if canonical and canonical not in selected:
-            selected.append(canonical)
-        if len(selected) == 20:
-            break
-    return selected
-
-
-async def _apply_detector_prompts(app: FastAPI, prompts: list[str]) -> AppState:
+async def _set_detector_prompts(app: FastAPI, prompts: list[str]) -> None:
     try:
         await run_in_threadpool(app.state.camera.set_detector_prompts, prompts)
     except (CameraUnavailable, RuntimeError, ValueError) as exc:
@@ -142,29 +135,95 @@ async def _apply_detector_prompts(app: FastAPI, prompts: list[str]) -> AppState:
             lambda state: setattr(state, "staff_error", "Detector prompts could not be updated.")
         )
         raise HTTPException(503, "Detector prompts could not be updated") from exc
-    return await app.state.state_store.mutate(
-        lambda state: (
-            setattr(state, "detector_prompts", prompts),
-            setattr(state, "staff_error", None),
-        )
+
+
+def _empty_prompt_learning_outcome() -> PromptLearningOutcome:
+    return PromptLearningOutcome()
+
+
+def _same_analysis(state: AppState, analysis: SceneAnalysis) -> bool:
+    return (
+        _is_current_analysis(state, analysis)
+        and not state.privacy_screen
     )
 
 
-async def _refresh_detector_prompts_from_analysis(
-    app: FastAPI, configured: Settings, labels: list[str]
-) -> None:
-    state = await app.state.state_store.snapshot()
-    if (
-        configured.detector_backend not in PROMPTABLE_DETECTOR_BACKENDS
-        or not state.detector_prompt_auto_update
-    ):
-        return
-    prompts = _approved_detector_prompts(configured, state.detector_prompts, labels)
-    try:
-        await _apply_detector_prompts(app, prompts)
-    except HTTPException:
-        # Scene analysis remains usable if the optional detector refresh fails.
-        return
+def _is_current_analysis(state: AppState, analysis: SceneAnalysis) -> bool:
+    return (
+        state.scene_analysis is not None
+        and state.scene_analysis.generated_at == analysis.generated_at
+    )
+
+
+async def _learn_detector_prompts_from_analysis(
+    app: FastAPI, configured: Settings, analysis: SceneAnalysis
+) -> PromptLearningOutcome:
+    if configured.detector_backend not in PROMPTABLE_DETECTOR_BACKENDS:
+        return _empty_prompt_learning_outcome()
+
+    async with app.state.detector_prompt_lock:
+        state = await app.state.state_store.snapshot()
+        plan = plan_prompt_learning(
+            state.detector_prompt_baseline,
+            state.detector_learned_prompts,
+            analysis.objects,
+            has_safety_notes=False,
+        )
+        rejection_reasons = Counter(analysis.prompt_rejection_reasons)
+        rejection_reasons.update(plan.outcome.rejection_reasons)
+        outcome = plan.outcome.model_copy(
+            update={
+                "rejected_count": sum(rejection_reasons.values()),
+                "rejection_reasons": dict(rejection_reasons),
+            }
+        )
+
+        def sanitise_current(app_state: AppState) -> None:
+            if _is_current_analysis(app_state, analysis):
+                app_state.scene_analysis.objects = plan.safe_objects
+
+        await app.state.state_store.mutate(sanitise_current)
+        state = await app.state.state_store.snapshot()
+        if not state.detector_prompt_auto_update or not _same_analysis(state, analysis):
+            return _empty_prompt_learning_outcome()
+
+        prompts_changed = plan.prompts != state.detector_prompts
+        if prompts_changed:
+            try:
+                await _set_detector_prompts(app, plan.prompts)
+            except HTTPException:
+                return _empty_prompt_learning_outcome()
+
+        learning_applied = False
+
+        def apply_learning(app_state: AppState) -> None:
+            nonlocal learning_applied
+            if not _same_analysis(app_state, analysis):
+                return
+            reasons = Counter(app_state.detector_prompt_rejection_reasons)
+            reasons.update(outcome.rejection_reasons)
+            app_state.detector_prompts = plan.prompts
+            app_state.detector_learned_prompts = plan.learned_prompts
+            app_state.detector_prompt_safety_rejections += (
+                outcome.rejected_count
+            )
+            app_state.detector_prompt_rejection_reasons = dict(reasons)
+            app_state.detector_prompt_capacity_skips += (
+                plan.outcome.capacity_skipped_count
+            )
+            if app_state.scene_analysis is not None:
+                app_state.scene_analysis.objects = plan.safe_objects
+            app_state.staff_error = None
+            learning_applied = True
+
+        await app.state.state_store.mutate(apply_learning)
+        if not learning_applied:
+            current = await app.state.state_store.snapshot()
+            if prompts_changed:
+                with suppress(HTTPException):
+                    await _set_detector_prompts(app, current.detector_prompts)
+            return _empty_prompt_learning_outcome()
+        return outcome
 
 
 def _degrade_modeldeck_state(state: AppState, detector_backend: str) -> None:
@@ -240,6 +299,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     if configured.detector_supports_prompts()
                     else []
                 ),
+                detector_prompt_baseline=(
+                    configured.detector_prompts
+                    if configured.detector_supports_prompts()
+                    else []
+                ),
                 detector_prompt_auto_update=(
                     configured.detector_prompt_auto_update
                     if configured.detector_supports_prompts()
@@ -271,6 +335,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.camera = camera
         app.state.analysis = analysis
         app.state.curated_questions = curated_questions
+        app.state.detector_prompt_lock = asyncio.Lock()
         monitor = asyncio.create_task(_camera_monitor(camera, state))
         automatic = asyncio.create_task(_automatic_analysis(app))
         try:
@@ -421,13 +486,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             analysis_result, applied = await request.app.state.analysis.analyse(
                 image, payload.question
             )
+            prompt_learning = _empty_prompt_learning_outcome()
             if applied:
-                await _refresh_detector_prompts_from_analysis(
-                    request.app,
-                    configured,
-                    [item.label for item in analysis_result.objects],
+                prompt_learning = await _learn_detector_prompts_from_analysis(
+                    request.app, configured, analysis_result
                 )
-            return {"analysis": analysis_result, "applied": applied}
+            return {
+                "analysis": analysis_result,
+                "applied": applied,
+                "prompt_learning": prompt_learning,
+            }
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         except AnalysisBusy as exc:
@@ -448,7 +516,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 scenario.detections,
             )
         )
-        return await request.app.state.state_store.reset(detections)
+        await request.app.state.state_store.reset(detections)
+        if configured.detector_backend in PROMPTABLE_DETECTOR_BACKENDS:
+            async with request.app.state.detector_prompt_lock:
+                current = await request.app.state.state_store.snapshot()
+                try:
+                    await _set_detector_prompts(
+                        request.app, current.detector_prompt_baseline
+                    )
+                except HTTPException:
+                    pass
+                await request.app.state.state_store.mutate(
+                    lambda app_state: (
+                        setattr(
+                            app_state,
+                            "detector_prompts",
+                            list(app_state.detector_prompt_baseline),
+                        ),
+                        setattr(app_state, "detector_learned_prompts", []),
+                        setattr(app_state, "detector_prompt_safety_rejections", 0),
+                        setattr(app_state, "detector_prompt_rejection_reasons", {}),
+                        setattr(app_state, "detector_prompt_capacity_skips", 0),
+                    )
+                )
+        return await request.app.state.state_store.snapshot()
 
     @app.post("/api/analysis/clear", response_model=AppState)
     async def clear_analysis(request: Request):
@@ -576,44 +667,46 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if payload.model not in models:
             raise HTTPException(400, "Unsupported detector model")
 
-        camera = request.app.state.camera
-        state_store = request.app.state.state_store
-        current = await state_store.snapshot()
-        was_running = current.camera_running
-        if was_running:
-            await camera.stop()
-
-        selected_settings = configured.model_copy(
-            update={
-                "detector_model": models[payload.model],
-                "detector_prompts": current.detector_prompts
-                or configured.detector_prompts,
-            }
-        )
-        try:
-            detector = await run_in_threadpool(create_detector, selected_settings)
-        except Exception as exc:
+        async with request.app.state.detector_prompt_lock:
+            camera = request.app.state.camera
+            state_store = request.app.state.state_store
+            current = await state_store.snapshot()
+            was_running = current.camera_running
             if was_running:
-                with suppress(CameraUnavailable):
-                    await camera.start(current.camera_device)
-            raise HTTPException(
-                503, "Detector model could not be loaded; the previous model remains selected"
-            ) from exc
+                await camera.stop()
 
-        camera.detector = detector
-        await state_store.mutate(
-            lambda state: (
-                setattr(state, "detector_model", payload.model),
-                setattr(state, "detections", []),
-                setattr(state, "staff_error", None),
+            selected_settings = configured.model_copy(
+                update={
+                    "detector_model": models[payload.model],
+                    "detector_prompts": current.detector_prompts
+                    or configured.detector_prompts,
+                }
             )
-        )
-        if was_running:
             try:
-                await camera.start(current.camera_device)
-            except CameraUnavailable as exc:
-                raise HTTPException(503, str(exc)) from exc
-        return await state_store.snapshot()
+                detector = await run_in_threadpool(create_detector, selected_settings)
+            except Exception as exc:
+                if was_running:
+                    with suppress(CameraUnavailable):
+                        await camera.start(current.camera_device)
+                raise HTTPException(
+                    503,
+                    "Detector model could not be loaded; the previous model remains selected",
+                ) from exc
+
+            camera.detector = detector
+            await state_store.mutate(
+                lambda state: (
+                    setattr(state, "detector_model", payload.model),
+                    setattr(state, "detections", []),
+                    setattr(state, "staff_error", None),
+                )
+            )
+            if was_running:
+                try:
+                    await camera.start(current.camera_device)
+                except CameraUnavailable as exc:
+                    raise HTTPException(503, str(exc)) from exc
+            return await state_store.snapshot()
 
     @app.post("/api/detector/prompts", response_model=AppState)
     async def select_detector_prompts(payload: DetectorPromptRequest, request: Request):
@@ -628,10 +721,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ):
             raise HTTPException(400, "Detector prompts must use the approved vocabulary")
         prompts = [approved[item.casefold()] for item in requested]
-        await _apply_detector_prompts(request.app, prompts)
-        return await request.app.state.state_store.mutate(
-            lambda state: setattr(state, "detector_prompt_auto_update", payload.auto_update)
-        )
+        async with request.app.state.detector_prompt_lock:
+            await _set_detector_prompts(request.app, prompts)
+            return await request.app.state.state_store.mutate(
+                lambda state: (
+                    setattr(state, "detector_prompts", prompts),
+                    setattr(state, "detector_prompt_baseline", prompts),
+                    setattr(state, "detector_learned_prompts", []),
+                    setattr(state, "detector_prompt_auto_update", payload.auto_update),
+                    setattr(state, "staff_error", None),
+                )
+            )
+
+    @app.post("/api/detector/learned/clear", response_model=AppState)
+    async def clear_learned_detector_prompts(request: Request):
+        if configured.detector_backend not in PROMPTABLE_DETECTOR_BACKENDS:
+            raise HTTPException(409, "The selected detector does not support text prompts")
+        async with request.app.state.detector_prompt_lock:
+            current = await request.app.state.state_store.snapshot()
+            await _set_detector_prompts(request.app, current.detector_prompt_baseline)
+            return await request.app.state.state_store.mutate(
+                lambda state: (
+                    setattr(
+                        state,
+                        "detector_prompts",
+                        list(state.detector_prompt_baseline),
+                    ),
+                    setattr(state, "detector_learned_prompts", []),
+                    setattr(state, "staff_error", None),
+                )
+            )
 
     @app.post("/api/auto-analyse", response_model=AppState)
     async def auto_analyse(payload: AutoAnalyseRequest, request: Request):
@@ -740,10 +859,8 @@ async def _automatic_analysis(app: FastAPI) -> None:
                 image, question
             )
             if applied:
-                await _refresh_detector_prompts_from_analysis(
-                    app,
-                    app.state.settings,
-                    [item.label for item in analysis_result.objects],
+                await _learn_detector_prompts_from_analysis(
+                    app, app.state.settings, analysis_result
                 )
         except (RuntimeError, ValueError, AnalysisBusy):
             pass

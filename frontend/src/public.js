@@ -10,6 +10,16 @@ const detectorPromptPresets = {
   technology: ['computer mouse', 'keyboard', 'laptop', 'monitor', 'mobile phone', 'headphones'],
   room: ['person', 'chair', 'table', 'book', 'backpack', 'bottle', 'cup', 'potted plant'],
 };
+const promptLearningReasonLabels = {
+  invalid_shape: 'malformed labels',
+  human_or_identity: 'human or identity descriptions',
+  sensitive_trait: 'sensitive traits',
+  medical_or_assistive: 'medical or assistive items',
+  religious_or_political: 'religious or political items',
+  intimate: 'intimate items',
+  weapon_or_drug: 'weapons or regulated substances',
+  model_safety_note: 'model safety notes',
+};
 const $ = (id) => document.getElementById(id);
 
 function showToast(message) {
@@ -218,8 +228,38 @@ function renderActivePrompts(prompts) {
   }
 }
 
+function renderLearnedPrompts(next) {
+  const panel = $('learnedPromptChips');
+  panel.replaceChildren();
+  for (const prompt of next.detector_learned_prompts || []) {
+    const chip = document.createElement('span');
+    chip.className = 'learned-prompt-chip';
+    chip.textContent = prompt;
+    panel.append(chip);
+  }
+  if (!next.detector_learned_prompts?.length) {
+    const empty = document.createElement('span');
+    empty.className = 'muted';
+    empty.textContent = 'No objects learned this session';
+    panel.append(empty);
+  }
+  $('clearLearnedPrompts').disabled = !next.detector_learned_prompts?.length;
+  const status = [
+    `${next.detector_learned_prompts?.length || 0} learned`,
+    `${next.detector_prompt_safety_rejections || 0} blocked by safety policy`,
+  ];
+  if (next.detector_prompt_capacity_skips) {
+    status.push(`${next.detector_prompt_capacity_skips} skipped at capacity`);
+  }
+  const reasons = Object.entries(next.detector_prompt_rejection_reasons || {})
+    .filter(([, count]) => count)
+    .map(([reason, count]) => `${promptLearningReasonLabels[reason] || 'other safety checks'}: ${count}`);
+  if (reasons.length) status.push(`Blocked categories — ${reasons.join(', ')}`);
+  $('promptLearningStatus').textContent = status.join(' · ');
+}
+
 function updatePromptPending() {
-  const active = new Set(state.current?.detector_prompts || []);
+  const active = new Set(state.current?.detector_prompt_baseline || []);
   const selected = selectedDetectorPrompts();
   const changed = selected.length !== active.size
     || selected.some(prompt => !active.has(prompt))
@@ -244,13 +284,14 @@ function renderOperator(next) {
   if (next.detector_model && document.activeElement !== $('detectorModelSelect')) {
     $('detectorModelSelect').value = next.detector_model;
   }
-  const activePrompts = next.detector_prompts || [];
-  renderActivePrompts(activePrompts);
+  const baselinePrompts = next.detector_prompt_baseline || [];
+  renderActivePrompts(baselinePrompts);
+  renderLearnedPrompts(next);
   const editingDetectorPrompts = document.activeElement?.name === 'detectorPrompt'
     || document.activeElement === $('selectAllDetectorPrompts')
     || document.activeElement === $('clearAllDetectorPrompts');
   if (!editingDetectorPrompts) {
-    const activeSet = new Set(activePrompts);
+    const activeSet = new Set(baselinePrompts);
     for (const input of document.querySelectorAll('input[name="detectorPrompt"]')) {
       input.checked = activeSet.has(input.value);
     }
@@ -485,7 +526,7 @@ function populateOperatorControls(config, initial) {
   );
   $('resetSession').onclick = () => act(
     () => post('/api/reset'),
-    'Session reset. Generated visitor text, latency and staff errors were cleared; detector settings were preserved.',
+    'Session reset. Generated visitor text and learned detector objects were cleared; the operator-selected detector baseline was restored.',
   );
   $('headerPrivacy').onclick = $('privacyOn').onclick;
   $('headerReset').onclick = $('resetSession').onclick;
@@ -525,10 +566,28 @@ function populateOperatorControls(config, initial) {
       prompts,
       auto_update: $('detectorPromptAutoUpdate').checked,
     });
-  }, result => `Object detection updated. ${result.detector_prompts.length} object prompts are active. Scene-analysis additions are ${result.detector_prompt_auto_update ? 'enabled' : 'disabled'}.`);
+  }, result => `Object detection updated. ${result.detector_prompt_baseline.length} operator prompts form the baseline and learned prompts were cleared. Safe session learning is ${result.detector_prompt_auto_update ? 'enabled' : 'disabled'}.`);
+  $('clearLearnedPrompts').onclick = () => act(
+    () => post('/api/detector/learned/clear'),
+    result => `Learned detector objects cleared. The ${result.detector_prompt_baseline.length}-prompt operator baseline is active; scene text was preserved.`,
+  );
   $('triggerAnalysis').onclick = () => act(
     () => post('/api/analyse', {question: $('questionSelect').value}),
-    result => `Scene analysis completed for “${$('questionSelect').value}”. The ${result.analysis.provider} result was ${result.applied ? 'displayed' : 'discarded because the session changed'}.`,
+    result => {
+      const learning = result.prompt_learning;
+      const details = [];
+      if (learning.added.length) details.push(`Learned: ${learning.added.join(', ')}.`);
+      if (learning.evicted.length) details.push(`Replaced older learned prompts: ${learning.evicted.join(', ')}.`);
+      if (learning.rejected_count) {
+        const reasons = Object.entries(learning.rejection_reasons || {})
+          .map(([reason, count]) => `${promptLearningReasonLabels[reason] || 'other safety checks'}: ${count}`)
+          .join(', ');
+        details.push(`${learning.rejected_count} suggestions were blocked by the safety policy (${reasons}).`);
+      }
+      if (learning.capacity_skipped_count) details.push(`${learning.capacity_skipped_count} suggestions were skipped because the protected baseline filled the detector.`);
+      const learningDetail = details.length ? ` ${details.join(' ')}` : ' No detector prompts changed.';
+      return `Scene analysis completed for “${$('questionSelect').value}”. The ${result.analysis.provider} result was ${result.applied ? 'displayed' : 'discarded because the session changed'}.${learningDetail}`;
+    },
   );
   $('clearAnalysis').onclick = () => act(
     () => post('/api/analysis/clear'),

@@ -16,10 +16,10 @@ validated state store -> SSE updates -> unified visitor/operator screen
 - `detection/` contains no-op, local YOLOE, and local YOLO-World adapters. Standard YOLO checkpoints are not accepted. Replay annotations use the same normalised `Detection` schema.
 - Detector inference has an independent maximum rate and reuses the latest valid boxes between passes, preventing camera FPS from driving continuous CPU-heavy preprocessing.
 - Runtime detector switching is restricted to model paths allowlisted by the operator at start-up. Model loading runs off the asynchronous event loop, and an active camera is paused and restarted around the change.
-- The YOLOE and YOLO-World adapters apply locally encoded text prompts under the same lock used for inference. Operator choices and structured model object labels are restricted to a configured, generic-object allowlist; summaries and other free-form text are never used as prompts.
+- The YOLOE and YOLO-World adapters apply locally encoded text prompts under the same lock used for inference. Operator choices form a protected baseline restricted to a configured allowlist. Optional session learning admits only structured object labels that pass the shared conservative label-and-description filter; summaries and other free-form text are never used as prompts.
 - `vision/` isolates deterministic offline providers and the ModelDeck gateway behind one provider protocol. The live adapter checks the published `scenechat-vision` route for `image_input` and `structured_output`, accepts only JPEG/PNG input, and adds trusted operational metadata only after strict output validation. ModelDeck may schedule its own Workers on private ports; SceneChat never addresses them directly.
 - `services/analysis.py` limits analysis to one request, applies a timeout, validates output, and rejects stale successes and failures by comparing state generations and provider selection.
-- `services/state.py` is the shared, concurrency-safe state boundary. The browser receives state through Server-Sent Events.
+- `services/state.py` is the shared, concurrency-safe state boundary. Detector prompt changes also use one application-level lock so manual selection, session learning, reset restoration, and detector switching cannot interleave. Freshness is checked atomically before learned state is committed. The browser receives state through Server-Sent Events.
 - The unified visitor/operator screen is dependency-free HTML, CSS, and JavaScript served by FastAPI. Its operator panel shares the same state stream as the visitor view, avoiding duplicate connections and a second build tool or process.
 
 ## Failure isolation
@@ -32,4 +32,4 @@ SceneChat serves its unified visitor/operator interface, API, session state, pri
 
 ## Data handling
 
-Frames exist only in camera and request memory. They are not written to disk, included in logs, or cached by browsers. The committed replay asset is synthetic. Curated questions eliminate public arbitrary-prompt input.
+Frames exist only in camera and request memory. They are not written to disk, included in logs, or cached by browsers. Learned detector vocabulary is session memory only; rejected raw labels are neither retained nor exposed, and only aggregate safe reason categories are counted. The committed replay asset is synthetic. Curated questions eliminate public arbitrary-prompt input.

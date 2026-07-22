@@ -122,6 +122,11 @@ h1 { font-size: clamp(2.3rem, 4vw, 4.2rem); line-height: .95; margin-bottom: 0; 
 .active-prompt-summary strong { display: block; margin-bottom: .5rem; }
 .active-prompt-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
 .active-prompt-chip { padding: .3rem .6rem; color: #062128; background: var(--gold); border-radius: 999px; font-weight: 750; }
+.learned-prompt-summary { margin-top: .7rem; padding: .8rem; background: #0b3b3855; border: 1px solid #2c716d; border-radius: .7rem; }
+.learned-prompt-heading { display: flex; align-items: center; justify-content: space-between; gap: .7rem; margin-bottom: .55rem; }
+.learned-prompt-heading .secondary-button { min-height: 2.35rem; padding: .4rem .65rem; }
+.learned-prompt-chip { padding: .3rem .6rem; color: #05272a; background: var(--teal); border-radius: 999px; font-weight: 750; }
+.prompt-learning-status { margin: .65rem 0 0; color: var(--muted); font-size: .85rem; }
 .pending-change { margin: .65rem 0 0; color: var(--gold); font-weight: 700; }
 .auto-question-options { margin: 1rem 0 .7rem; padding: 0; border: 0; }
 .auto-question-options legend { margin-bottom: .55rem; color: var(--muted); font-weight: 700; }
