@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=10">
+  <link rel="stylesheet" href="/assets/styles.css?v=11">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -14,6 +14,8 @@
     </div>
     <div class="topbar-actions">
       <div id="modeBadge" class="mode-badge">Prepared demonstration</div>
+      <button id="headerPrivacy" class="danger-button compact-button">Hide camera</button>
+      <button id="headerReset" class="secondary-button compact-button">Reset session</button>
       <a id="operatorControlsLink" href="#operator-controls" class="secondary-button">Operator controls</a>
     </div>
   </header>
@@ -67,10 +69,11 @@
   <details id="operator-controls" class="operator-shell">
     <summary>
       <span>Operator controls</span>
-      <small>Camera, privacy, model and diagnostics</small>
+      <small>Session, analysis, camera and object detection</small>
     </summary>
     <div class="operator-layout">
       <section class="control-panel emergency-panel">
+        <p class="panel-kicker">Session safety</p>
         <h2>Immediate controls</h2>
         <div class="button-row">
           <button id="privacyOn" class="danger-button">Hide camera now</button>
@@ -81,20 +84,52 @@
       </section>
 
       <section class="control-panel">
+        <p class="panel-kicker">Run configuration</p>
         <h2>Operating mode</h2>
         <label>Application mode<select id="modeSelect"></select></label>
         <label>Scene provider<select id="providerSelect"></select></label>
         <label>Replay scenario<select id="scenarioSelect"></select></label>
-        <div class="button-row"><button id="applyMode" class="primary-button">Apply selections</button><button id="checkProvider" class="secondary-button">Check provider readiness</button><button id="detectorOnly" class="secondary-button">Disable scene analysis</button></div>
+        <div class="button-row"><button id="applyMode" class="primary-button">Apply run configuration</button><button id="checkProvider" class="secondary-button">Check provider</button><button id="detectorOnly" class="secondary-button">Camera only</button></div>
         <p id="providerGuidance">ModelDeck Workers are started and managed in ModelDeck, not SceneChat.</p>
       </section>
 
       <section class="control-panel">
+        <p class="panel-kicker">Descriptions</p>
+        <h2>Scene analysis</h2>
+        <div id="autoScheduleStatus" class="setting-status">Automatic analysis is off</div>
+        <label>Question for Run now<select id="questionSelect"></select></label>
+        <div class="button-row"><button id="triggerAnalysis" class="primary-button">Run analysis now</button><button id="clearAnalysis" class="secondary-button">Clear description</button></div>
+        <div class="inline-fields"><label class="check-label"><input id="autoEnabled" type="checkbox"> Run automatically</label><label>Interval (seconds)<input id="autoInterval" type="number" min="20" max="60" value="20"></label></div>
+        <fieldset class="auto-question-options">
+          <legend>Questions used automatically</legend>
+          <div class="prompt-selection-toolbar">
+            <span id="autoQuestionSelectionCount" aria-live="polite">0 selected</span>
+            <div class="prompt-selection-actions">
+              <button id="selectAllAutoQuestions" type="button">Select all</button>
+              <button id="clearAllAutoQuestions" type="button">Clear all</button>
+            </div>
+          </div>
+          <div id="autoQuestionChoices" class="auto-question-choices"></div>
+        </fieldset>
+        <p id="autoSchedulePending" class="pending-change" hidden></p>
+        <button id="applyAuto" class="secondary-button">Apply automatic schedule</button>
+        <p>Automatic runs randomly rotate through the selected curated questions and never run more often than every 20 seconds.</p>
+      </section>
+
+      <section class="control-panel">
+        <p class="panel-kicker">Live input</p>
         <h2>Camera</h2>
         <fieldset class="camera-options">
           <legend>Camera device</legend>
           <div id="cameraChoices" class="camera-choices"></div>
         </fieldset>
+        <div class="button-row"><button id="startCamera" class="primary-button">Start camera</button><button id="stopCamera" class="secondary-button">Stop camera</button></div>
+        <p>Camera support is optional. Replay remains available if the camera cannot start.</p>
+      </section>
+
+      <section class="control-panel detection-panel">
+        <p class="panel-kicker">Fast highlights</p>
+        <h2>Object detection</h2>
         <div id="detectorModelControls" hidden>
           <label>Object detector model<select id="detectorModelSelect"></select></label>
           <button id="applyDetectorModel" class="secondary-button">Switch detector model</button>
@@ -103,6 +138,11 @@
         <div id="detectorPromptControls" hidden>
           <fieldset class="prompt-options">
             <legend>Objects to detect</legend>
+            <div class="prompt-presets" aria-label="Object prompt presets">
+              <button type="button" data-prompt-preset="essentials">Open Day essentials</button>
+              <button type="button" data-prompt-preset="technology">Desk and technology</button>
+              <button type="button" data-prompt-preset="room">Room and belongings</button>
+            </div>
             <div class="prompt-selection-toolbar">
               <span id="detectorPromptSelectionCount" aria-live="polite">0 selected</span>
               <div class="prompt-selection-actions">
@@ -117,25 +157,14 @@
             <div id="activePromptChips" class="active-prompt-chips"></div>
             <p id="detectorPromptPending" class="pending-change" hidden></p>
           </div>
-          <label class="check-label"><input id="detectorPromptAutoUpdate" type="checkbox"> Add approved objects after each scene description</label>
-          <button id="applyDetectorPrompts" class="secondary-button">Apply object prompts</button>
-          <p>Model suggestions are accepted only when they match the approved vocabulary.</p>
+          <label class="check-label"><input id="detectorPromptAutoUpdate" type="checkbox"> Add approved objects found by scene analysis</label>
+          <button id="applyDetectorPrompts" class="primary-button">Apply object detection changes</button>
+          <p>Only structured object labels matching the approved list are added. Your active choices are preserved.</p>
         </div>
-        <div class="button-row"><button id="startCamera" class="primary-button">Start camera</button><button id="stopCamera" class="secondary-button">Stop camera</button></div>
-        <p>Camera support is optional. Replay remains available if the camera cannot start.</p>
       </section>
 
-      <section class="control-panel">
-        <h2>Scene analysis</h2>
-        <label>Curated question<select id="questionSelect"></select></label>
-        <div class="button-row"><button id="triggerAnalysis" class="primary-button">Generate scene description</button><button id="clearAnalysis" class="secondary-button">Clear description</button></div>
-        <div class="inline-fields"><label class="check-label"><input id="autoEnabled" type="checkbox"> Automatic</label><label>Interval (seconds)<input id="autoInterval" type="number" min="20" max="60" value="20"></label></div>
-        <button id="applyAuto" class="secondary-button">Apply automatic schedule</button>
-        <p>Each automatic analysis randomly chooses a curated question and avoids repeating the previous question when possible.</p>
-      </section>
-
-      <section class="control-panel diagnostics-panel">
-        <h2>Diagnostics</h2>
+      <details class="control-panel diagnostics-panel">
+        <summary><span>Diagnostics</span><small>Health, performance and provider details</small></summary>
         <dl class="diagnostics">
           <div><dt>Health</dt><dd id="healthValue">Checking…</dd></div>
           <div><dt>Mode</dt><dd id="modeValue">—</dd></div>
@@ -149,7 +178,7 @@
           <div><dt>System available</dt><dd id="systemMemoryValue">—</dd></div>
         </dl>
         <div id="staffError" class="staff-error" hidden></div>
-      </section>
+      </details>
     </div>
   </details>
 
@@ -159,6 +188,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="/assets/public.js?v=11" defer></script>
+  <script src="/assets/public.js?v=12" defer></script>
 </body>
 </html>

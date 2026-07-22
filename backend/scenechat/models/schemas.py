@@ -93,6 +93,9 @@ class AppState(BaseModel):
     analysis_in_progress: bool = False
     auto_analyse: bool = False
     auto_analyse_interval_seconds: float = 20
+    auto_analyse_questions: list[str] = Field(
+        default_factory=lambda: ["Describe the scene."]
+    )
     staff_error: str | None = None
 
 

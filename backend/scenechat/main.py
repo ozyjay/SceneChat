@@ -72,6 +72,7 @@ class DetectorPromptRequest(BaseModel):
 class AutoAnalyseRequest(BaseModel):
     enabled: bool
     interval_seconds: float = Field(default=20, ge=20, le=60)
+    questions: list[str] | None = Field(default=None, min_length=1, max_length=20)
 
 
 class ReplayRequest(BaseModel):
@@ -118,9 +119,11 @@ def _select_automatic_question(questions: list[str], current: str) -> str:
     return random.choice(candidates)
 
 
-def _approved_detector_prompts(configured: Settings, labels: list[str]) -> list[str]:
+def _approved_detector_prompts(
+    configured: Settings, active_prompts: list[str], labels: list[str]
+) -> list[str]:
     approved = {item.casefold(): item for item in configured.detector_prompt_allowlist}
-    selected = list(configured.detector_prompts)
+    selected = list(active_prompts)
     for label in labels:
         normalised = " ".join(label.strip().lower().split())
         canonical = approved.get(normalised.casefold())
@@ -156,7 +159,7 @@ async def _refresh_detector_prompts_from_analysis(
         or not state.detector_prompt_auto_update
     ):
         return
-    prompts = _approved_detector_prompts(configured, labels)
+    prompts = _approved_detector_prompts(configured, state.detector_prompts, labels)
     try:
         await _apply_detector_prompts(app, prompts)
     except HTTPException:
@@ -250,6 +253,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 ),
                 auto_analyse=configured.auto_analyse,
                 auto_analyse_interval_seconds=configured.auto_analyse_interval_seconds,
+                auto_analyse_questions=curated_questions,
             )
         )
         detector = create_detector(configured)
@@ -631,10 +635,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/api/auto-analyse", response_model=AppState)
     async def auto_analyse(payload: AutoAnalyseRequest, request: Request):
+        questions = payload.questions
+        if questions is not None and (
+            len(set(questions)) != len(questions)
+            or any(question not in request.app.state.curated_questions for question in questions)
+        ):
+            raise HTTPException(400, "Automatic analysis must use unique curated questions")
+
         return await request.app.state.state_store.mutate(
             lambda state: (
                 setattr(state, "auto_analyse", payload.enabled),
                 setattr(state, "auto_analyse_interval_seconds", payload.interval_seconds),
+                setattr(
+                    state,
+                    "auto_analyse_questions",
+                    questions if questions is not None else state.auto_analyse_questions,
+                ),
             )
         )
 
@@ -718,7 +734,7 @@ async def _automatic_analysis(app: FastAPI) -> None:
             image = app.state.registry.image_path(state.replay_scenario).read_bytes()
         try:
             question = _select_automatic_question(
-                app.state.curated_questions, state.selected_question
+                state.auto_analyse_questions, state.selected_question
             )
             analysis_result, applied = await app.state.analysis.analyse(
                 image, question
