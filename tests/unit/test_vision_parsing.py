@@ -45,9 +45,32 @@ def test_rejects_extra_operational_fields_and_unbounded_list_text():
     with pytest.raises(VisionProviderError, match="invalid structured response"):
         parse_scene_analysis(json.dumps(extra), "modeldeck")
 
-    too_long = valid_payload() | {"relationships": ["x" * 301]}
+    too_long = valid_payload() | {"relationships": ["x" * 181]}
     with pytest.raises(VisionProviderError, match="invalid structured response"):
         parse_scene_analysis(json.dumps(too_long), "modeldeck")
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"summary": "word " * 45},
+        {
+            "objects": [
+                {
+                    "label": "object",
+                    "description": "word " * 16,
+                    "approximate_location": "centre",
+                }
+            ]
+        },
+        {"relationships": ["First sentence. Second sentence."]},
+        {"uncertainties": ["uncertain"] * 4},
+        {"safety_notes": ["note", "another note"]},
+    ],
+)
+def test_rejects_output_outside_modeldeck_contract_bounds(change):
+    with pytest.raises(VisionProviderError, match="invalid structured response"):
+        parse_scene_analysis(json.dumps(valid_payload() | change), "modeldeck")
 
 
 @pytest.mark.parametrize(

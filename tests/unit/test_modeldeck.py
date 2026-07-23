@@ -35,8 +35,14 @@ def request_image(request: httpx.Request) -> bytes:
     payload = json.loads(request.content)
     data_url = payload["messages"][0]["content"][0]["image_url"]["url"]
     prefix, encoded = data_url.split(",", 1)
-    assert prefix == "data:image/jpeg;base64"
+    assert prefix in {"data:image/jpeg;base64", "data:image/png;base64"}
     return base64.b64decode(encoded)
+
+
+def request_media_type(request: httpx.Request) -> str:
+    payload = json.loads(request.content)
+    data_url = payload["messages"][0]["content"][0]["image_url"]["url"]
+    return data_url.partition(";")[0].removeprefix("data:")
 
 
 def image_dimensions(image: bytes) -> tuple[int, int]:
@@ -193,15 +199,18 @@ async def test_modeldeck_accepts_supported_jpeg_and_png_inputs(extension):
         2,
         transport=httpx.MockTransport(handle),
     )
+    source = encoded_image(400, 300, extension)
     try:
-        result = await provider.analyse_scene(
-            encoded_image(400, 300, extension), "Describe the scene."
-        )
+        result = await provider.analyse_scene(source, "Describe the scene.")
     finally:
         await provider.close()
 
     assert result.summary == "A prepared scene is visible."
     assert image_dimensions(request_image(requests[0])) == (400, 300)
+    assert request_image(requests[0]) == source
+    assert request_media_type(requests[0]) == (
+        "image/png" if extension == ".png" else "image/jpeg"
+    )
 
 
 @pytest.mark.anyio
@@ -279,7 +288,7 @@ async def test_modeldeck_rejects_model_generated_operational_metrics():
 
 
 def test_prepare_analysis_image_fails_explicitly_when_reencoding_fails(monkeypatch):
-    source = encoded_image(320, 180)
+    source = encoded_image(1280, 720)
     monkeypatch.setattr(cv2, "imencode", lambda *_args, **_kwargs: (False, None))
 
     with pytest.raises(VisionProviderError, match="could not be encoded as JPEG"):
@@ -308,23 +317,28 @@ def test_prepare_analysis_image_downscales_landscape_and_portrait(source, expect
 
     assert (prepared.original_width, prepared.original_height) == source
     assert (prepared.transmitted_width, prepared.transmitted_height) == expected
-    assert image_dimensions(prepared.jpeg) == expected
+    assert image_dimensions(prepared.encoded) == expected
+    assert prepared.media_type == "image/jpeg"
 
 
 def test_prepare_analysis_image_does_not_upscale_smaller_image():
-    prepared = prepare_analysis_image(encoded_image(320, 180), max_edge=512)
+    source = encoded_image(320, 180)
+    prepared = prepare_analysis_image(source, max_edge=512)
 
     assert (prepared.original_width, prepared.original_height) == (320, 180)
     assert (prepared.transmitted_width, prepared.transmitted_height) == (320, 180)
-    assert image_dimensions(prepared.jpeg) == (320, 180)
+    assert prepared.encoded == source
+    assert prepared.media_type == "image/jpeg"
 
 
 def test_prepare_analysis_image_keeps_full_dimensions_when_resizing_is_disabled():
-    prepared = prepare_analysis_image(encoded_image(1280, 720), max_edge=0)
+    source = encoded_image(1280, 720, ".png")
+    prepared = prepare_analysis_image(source, max_edge=0)
 
     assert (prepared.original_width, prepared.original_height) == (1280, 720)
     assert (prepared.transmitted_width, prepared.transmitted_height) == (1280, 720)
-    assert image_dimensions(prepared.jpeg) == (1280, 720)
+    assert prepared.encoded == source
+    assert prepared.media_type == "image/png"
     assert prepared.resize_ms == 0.0
 
 

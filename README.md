@@ -55,7 +55,7 @@ The scene panel clearly reports when analysis is ready, actively thinking, displ
 
 SceneChat binds only to `3700`. It sends model requests only to the dedicated `http://127.0.0.1:8600/v1/vision/analyse` gateway route using the `scenechat-vision` alias and `scene-analysis-v1` contract. Readiness requires `image_input` and `structured_output`. SceneChat never calls ModelDeck management or Worker ports and cannot create, start, stop or replace Workers.
 
-The 2026 Open Day profile uses a prepared Qwen3.5 0.8B ROCm Worker with a 280-visual-token budget. ModelDeck owns its model discovery, credentials, lifecycle and private routing. SceneChat has no Worker credential and performs no live model download.
+The 2026 Open Day profile uses the promoted Qwen3.5 0.8B ROCm Worker from ModelDeck runtime package 0.2.2 with a 140-visual-token budget. ModelDeck owns its model discovery, credentials, lifecycle and private routing. SceneChat has no Worker credential and performs no live model download.
 
 ## Configuration
 
@@ -75,11 +75,11 @@ VISION_MAX_TOKENS=512
 
 Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or Worker URLs are rejected at start-up. No ModelDeck secret is configured in SceneChat. Storage of frames or video is also rejected by configuration.
 
-`VISION_MAX_TOKENS` limits the complete structured scene-description response. The default is 512, matching the prepared Worker's maximum; lower values down to 128 remain valid for deliberate latency experiments, but can truncate the JSON response.
+`VISION_MAX_TOKENS` limits the complete structured scene-description response. SceneChat deliberately requests at most 512 tokens even though the promoted Worker permits a 1,024-token hard ceiling. The qualified responses remained below 512 tokens, so this application-side bound retains truncation headroom without adopting the Worker's full failure ceiling. Lower values down to 128 remain valid for deliberate latency experiments, but can truncate the JSON response.
 
-`VISION_ANALYSIS_MAX_EDGE` is an optional transport and experimentation control for only the in-memory image copy sent to ModelDeck. The default `0` disables manual resizing; experimental limits from 256 to 1280 pixels are accepted. A value of 512 converts a 1280×720 frame to 512×288 and a 720×1280 frame to 288×512 without cropping, padding, stretching or upscaling. SceneChat uses OpenCV `INTER_AREA` interpolation when shrinking and re-encodes the request copy as JPEG at quality 82. The original camera frame remains unchanged for browser display and object detection, and neither copy is written to disk.
+`VISION_ANALYSIS_MAX_EDGE` is an optional transport and experimentation control for only the in-memory image copy sent to ModelDeck. The default `0` disables manual resizing and preserves the validated JPEG or PNG bytes. Experimental limits from 256 to 1280 pixels are accepted. A value of 512 converts a 1280×720 frame to 512×288 and a 720×1280 frame to 288×512 without cropping, padding, stretching or upscaling. SceneChat uses OpenCV `INTER_AREA` interpolation when shrinking and re-encodes only the resized request copy as JPEG at quality 82. The original camera frame remains unchanged for browser display and object detection, and neither copy is written to disk.
 
-Image dimensions, encoded byte counts, resize duration, total provider latency and the request outcome are logged for successful and timed-out ModelDeck analysis requests. These diagnostics never include image or base64 data, prompts, or visitor-derived descriptions. Pixel resizing primarily changes transport size and does not imply an inference-latency improvement. The prepared Worker owns the Qwen3.5 processor configuration and uses the selected 280-visual-token budget; SceneChat sends no visual-token setting.
+Image dimensions, encoded byte counts, resize duration, total provider latency and the request outcome are logged for successful and timed-out ModelDeck analysis requests. These diagnostics never include image or base64 data, prompts, or visitor-derived descriptions. Pixel resizing primarily changes transport size and does not imply an inference-latency improvement. The prepared Worker owns the Qwen3.5 processor configuration and uses the selected 140-visual-token budget; SceneChat sends no visual-token setting.
 
 SceneChat uses promptable YOLOE and YOLO-World checkpoints so both detector choices share the same operator-selected baseline. Set `DETECTOR_MODEL` to a local default and configure an explicit server-side allowlist for model switching and manual prompt selection; the browser receives identifiers rather than paths:
 
@@ -123,7 +123,7 @@ Do not promote a model backend to Open Day use until the hardware checks in [MOD
 ## ModelDeck and SceneChat start-up
 
 1. In the ModelDeck repository, run its port and environment checks, then start it in Open Day mode with its PowerShell scripts.
-2. Open `http://127.0.0.1:3600`, start the prepared Qwen3.5 0.8B, 280vt ROCm Worker, and wait for **ready**.
+2. Open `http://127.0.0.1:3600`, start the promoted Qwen3.5 0.8B, 140vt ROCm Worker from runtime package 0.2.2 assigned to Open2026 revision 35, and wait for **ready**.
 3. From this repository, run `pwsh -NoProfile -File scripts/check_modeldeck.ps1`.
 4. Run `pwsh -NoProfile -File scripts/run.ps1`, open `http://127.0.0.1:3700/`, and use **Check provider readiness**.
 5. Start the camera, then apply `live` mode with `modeldeck`. If readiness fails, remain in camera-only mode or explicitly select replay/fallback.

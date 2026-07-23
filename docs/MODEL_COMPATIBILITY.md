@@ -1,6 +1,6 @@
 # Model and hardware compatibility record
 
-Last updated: 23 July 2026. Measurements marked **not run** must be completed on the actual booth system. Earlier direct-runtime evidence is retained only as historical context and does not validate the current ModelDeck route.
+Last updated: 24 July 2026. Measurements marked **not run** must be completed on the actual booth system. Earlier direct-runtime and revision-34 evidence is retained only as historical context and does not validate the current SceneChat path through the promoted ModelDeck route.
 
 ## Current production candidate
 
@@ -11,7 +11,10 @@ Last updated: 23 July 2026. Measurements marked **not run** must be completed on
 | Required capabilities | `image_input`, `structured_output` |
 | Model | Qwen3.5 0.8B |
 | Runtime | ModelDeck Qwen3.5 ROCm Worker |
-| Visual-token budget | 280 |
+| ModelDeck runtime package | 0.2.2 |
+| Visual-token budget | 140 |
+| Worker completion ceiling | 1,024 |
+| SceneChat request ceiling | 512 |
 | SceneChat gateway | `http://127.0.0.1:8600` |
 | Preferred endpoint | `POST /v1/vision/analyse` |
 
@@ -46,16 +49,17 @@ Record one complete immutable fingerprint and the following results:
 
 | Result | Value |
 |---|---|
-| ModelDeck version and active Event revision | ModelDeck 0.1.0 at `2d8d7ebe0decc36fa81c37568b9792f93189a501`; `Open2026` revision 34 |
-| Worker definition/runtime fingerprint | `Qwen3.5 0.8B 280vt`; `qwen35-vision-language-transformers-rocm`; template `scenechat-qwen35` 0.1.0; bfloat16; 280 visual tokens; 512 maximum completion tokens |
+| ModelDeck version and active Event revision | ModelDeck 0.1.0 at `278f436637cf3e003bf70645c281135455460034`; `Open2026` revision 35 |
+| Worker definition/runtime fingerprint | immutable Worker `3ad2f88d-8936-4ffc-ac63-6b5e6543d4ed`; `qwen35-vision-language-transformers-rocm`; runtime package 0.2.2; bfloat16; 140 visual tokens; 1,024 Worker completion ceiling; SceneChat requests at most 512 |
 | Exact model revision and artefact fingerprint | `Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17`; locally cached source model |
 | Gateway alias, protocol and capabilities | passed for `scenechat-vision`, `scene-analysis-v1`, `image_input` and `structured_output`; cloud fallback disabled |
-| Prepared JPEG/PNG request and strict schema | failed: two warm-ups and five measured prepared-image requests passed, then the sixth measured curated question reached the 512-token limit and failed output validation |
-| Ten-request median/p95 and failure count | failed before completion: five measured ModelDeck round trips had 9,432.2 ms median and 9,835.3 ms nearest-rank p95; one subsequent request failed after 14,887.5 ms; the 8,000 ms end-to-end median gate cannot pass when the provider median alone exceeds it |
-| Prompt/completion token metrics and limit hits | incomplete because the run stopped on failure; the failed request used 512 of 512 completion tokens and was rejected as `token_limit_reached` |
-| Gateway-outage/Worker-not-ready drill | passed: HTTP 503 was sanitised, `modeldeck` remained selected, the previous valid result was retained, the app degraded to detector-only mode, and explicit Worker restart/readiness recovery succeeded |
-| Reset during inference | passed against the current route; the eventual result was discarded as stale |
-| Privacy during inference | passed against the current route; `/api/frame` hid the image immediately and the eventual result was discarded as stale |
+| ModelDeck isolated qualification | passed functionally: all 70 measured responses were schema-valid with zero failures or length finishes; ModelDeck recorded 8.76-second p50 and 10.07-second p95 and promoted the Worker under an explicit operator exception to the 8-second median target |
+| SceneChat prepared JPEG/PNG request and strict schema | passed after preserving the validated 59,214-byte PNG when resizing is disabled: two warm-ups and all ten measured requests were schema-valid with zero failures |
+| SceneChat ten-request median/p95 and failure count | latency gate failed: 9,200.8 ms end-to-end median and 10,171.4 ms nearest-rank p95; the 8,000 ms median target failed and the 12,000 ms p95 target passed |
+| Prompt/completion token metrics and limit hits | 518 prompt-token median; 315.5 completion-token median; 300–358 completion-token range; zero 512-token limit hits; 35.03 observed completion tokens/second median |
+| Gateway-outage/Worker-not-ready drill | passed against revision 34: HTTP 503 was sanitised, `modeldeck` remained selected, the previous valid result was retained, the app degraded to detector-only mode, and explicit Worker restart/readiness recovery succeeded; **not rerun** against revision 35 |
+| Reset during inference | passed against revision 35; the eventual result was discarded as stale |
+| Privacy during inference | passed against revision 35; `/api/frame` hid the image immediately and the eventual result was discarded as stale |
 | 60-minute camera run | not run |
 | Two-hour camera plus model stability | not run |
 | Physical camera disconnect/reconnect | not run |
@@ -63,13 +67,26 @@ Record one complete immutable fingerprint and the following results:
 
 The opt-in acceptance uses only the committed synthetic `demo_booth.png`. It does not print model descriptions or persist a request image.
 
-The 23 July attempt used SceneChat commit
+The failed 23 July revision-34 attempt used SceneChat commit
 `604d50accd6738af25464fc9ea2a84bf81709f1d` plus a local acceptance fix that
 prevents a stopped camera's buffered frame from being used for analysis. Before
 that fix, the benchmark safety check served the replay frame through `/api/frame`
 but `/api/analyse` could still select the last buffered camera frame. The
 corrected offline suite passed 152 tests, and all requests in the repeated
 physical attempt used the same prepared 59,214-byte source image.
+
+ModelDeck subsequently qualified runtime package 0.2.2 with 140 visual tokens,
+bounded output wording and complete-JSON stopping. All 70 isolated responses were
+valid. The recorded 8.76-second median exceeded the standard 8-second target, and
+manual review, combined two-hour load and drills were not completed for that Worker.
+On 24 July the operator explicitly accepted those exceptions and promoted it in
+Open2026 revision 35. ModelDeck's native and gateway synthetic PNG smoke tests passed,
+and SceneChat's application-level run now confirms the revised exact prompt, strict
+parser and 512-token request ceiling. The first SceneChat attempt re-encoded the
+prepared PNG to JPEG and produced a deterministic schema violation for the
+closest-object question. Preserving validated JPEG or PNG bytes when resizing is
+disabled made all measured requests valid. The completed run still failed the
+8-second median latency gate at 9.20 seconds; its 10.17-second p95 passed.
 
 ## Preliminary host evidence
 
@@ -81,10 +98,11 @@ physical attempt used the same prepared 59,214-byte source image.
 
 ## Decision
 
-The current Qwen3.5 production candidate is **no-go**: its repeated prepared-image
-acceptance run did not complete ten measured requests, exceeded the median latency
-gate on the partial sample, and failed strict output validation when one curated
-question reached the 512-token limit. Open Day status also remains no-go until the
-long-duration runs, physical camera recovery, cold reboot and operator handover are
-recorded as passed. Replay and live-camera-only operation remain the approved explicit
-fallbacks. There is no automatic cloud or provider failover.
+ModelDeck has promoted the current Qwen3.5 Worker under a documented operator
+exception, but the complete SceneChat Open Day configuration remains **no-go**. Its
+revision-35 functional acceptance and p95 latency gate passed, while its 9.20-second
+median remains above the 8-second SceneChat target. That result, the long-duration
+runs, physical camera recovery, cold reboot and operator handover must be recorded as
+passed or explicitly waived.
+Replay and live-camera-only operation remain the approved explicit fallbacks. There
+is no automatic cloud or provider failover.

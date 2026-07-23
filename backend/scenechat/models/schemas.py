@@ -1,9 +1,23 @@
 """Pydantic schemas shared by services and API routes."""
 
+import re
 from datetime import datetime, timezone
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+_WORD = re.compile(r"\b[\w'-]+\b", re.UNICODE)
+_SENTENCE_END = re.compile(r"[.!?]+(?:\s|$)")
+
+
+def _word_count(value: str) -> int:
+    return len(_WORD.findall(value))
+
+
+def _sentence_count(value: str) -> int:
+    endings = len(_SENTENCE_END.findall(value))
+    return max(1, endings) if value.strip() else 0
 
 
 def utc_now() -> datetime:
@@ -39,12 +53,19 @@ class Detection(BaseModel):
 class ObjectDescription(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    label: str = Field(min_length=1, max_length=80)
-    description: str = Field(min_length=1, max_length=300)
-    approximate_location: str = Field(min_length=1, max_length=80)
+    label: str = Field(min_length=1, max_length=48)
+    description: str = Field(min_length=1, max_length=150)
+    approximate_location: str = Field(min_length=1, max_length=48)
+
+    @field_validator("description")
+    @classmethod
+    def bounded_description_words(cls, value: str) -> str:
+        if _word_count(value) > 15:
+            raise ValueError("object descriptions must contain no more than 15 words")
+        return value
 
 
-PublicListItem = Annotated[str, Field(min_length=1, max_length=300)]
+PublicListItem = Annotated[str, Field(min_length=1, max_length=180)]
 
 
 class SceneAnalysisPayload(BaseModel):
@@ -52,11 +73,27 @@ class SceneAnalysisPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    summary: str = Field(min_length=1, max_length=800)
-    objects: list[ObjectDescription] = Field(default_factory=list, max_length=30)
-    relationships: list[PublicListItem] = Field(default_factory=list, max_length=20)
-    uncertainties: list[PublicListItem] = Field(default_factory=list, max_length=20)
-    safety_notes: list[PublicListItem] = Field(default_factory=list, max_length=10)
+    summary: str = Field(min_length=1, max_length=360)
+    objects: list[ObjectDescription] = Field(default_factory=list, max_length=8)
+    relationships: list[PublicListItem] = Field(default_factory=list, max_length=3)
+    uncertainties: list[PublicListItem] = Field(default_factory=list, max_length=3)
+    safety_notes: list[PublicListItem] = Field(default_factory=list, max_length=1)
+
+    @field_validator("summary")
+    @classmethod
+    def bounded_summary_words(cls, value: str) -> str:
+        if _word_count(value) >= 45:
+            raise ValueError("summary must contain fewer than 45 words")
+        return value
+
+    @field_validator("relationships", "uncertainties", "safety_notes")
+    @classmethod
+    def bounded_list_items(cls, value: list[str]) -> list[str]:
+        if any(_word_count(item) > 24 for item in value):
+            raise ValueError("list entries must contain no more than 24 words")
+        if any(_sentence_count(item) > 1 for item in value):
+            raise ValueError("list entries must contain at most one sentence")
+        return value
 
 
 class SceneAnalysis(SceneAnalysisPayload):

@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class PreparedAnalysisImage:
-    jpeg: bytes
+    encoded: bytes
+    media_type: str
     original_width: int
     original_height: int
     transmitted_width: int
@@ -43,9 +44,12 @@ def analysis_dimensions(width: int, height: int, max_edge: int) -> tuple[int, in
 
 
 def prepare_analysis_image(image: bytes, max_edge: int) -> PreparedAnalysisImage:
-    """Decode, optionally downscale, and JPEG-encode an in-memory request copy."""
-    supported_signatures = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff")
-    if not image.startswith(supported_signatures):
+    """Validate and optionally downscale an in-memory JPEG or PNG request copy."""
+    if image.startswith(b"\x89PNG\r\n\x1a\n"):
+        source_media_type = "image/png"
+    elif image.startswith(b"\xff\xd8\xff"):
+        source_media_type = "image/jpeg"
+    else:
         raise VisionProviderError(
             "The selected frame is not a supported JPEG or PNG image.",
             code="unsupported_image",
@@ -69,31 +73,37 @@ def prepare_analysis_image(image: bytes, max_edge: int) -> PreparedAnalysisImage
         original_width, original_height, max_edge
     )
     resize_ms = 0.0
-    if (transmitted_width, transmitted_height) != (original_width, original_height):
-        resize_started = time.perf_counter()
-        decoded = cv2.resize(
-            decoded,
-            (transmitted_width, transmitted_height),
-            interpolation=cv2.INTER_AREA,
-        )
-        resize_ms = round((time.perf_counter() - resize_started) * 1000, 1)
-    try:
-        encoded_ok, encoded = cv2.imencode(
-            ".jpg", decoded, [cv2.IMWRITE_JPEG_QUALITY, ANALYSIS_JPEG_QUALITY]
-        )
-    except cv2.error as exc:
-        raise VisionProviderError(
-            "The analysis image could not be encoded as JPEG.",
-            code="image_encode_failed",
-        ) from exc
-    if not encoded_ok:
-        raise VisionProviderError(
-            "The analysis image could not be encoded as JPEG.",
-            code="image_encode_failed",
-        )
+    if (transmitted_width, transmitted_height) == (original_width, original_height):
+        encoded = image
+        media_type = source_media_type
+    else:
+        try:
+            resize_started = time.perf_counter()
+            decoded = cv2.resize(
+                decoded,
+                (transmitted_width, transmitted_height),
+                interpolation=cv2.INTER_AREA,
+            )
+            resize_ms = round((time.perf_counter() - resize_started) * 1000, 1)
+            encoded_ok, resized_encoded = cv2.imencode(
+                ".jpg", decoded, [cv2.IMWRITE_JPEG_QUALITY, ANALYSIS_JPEG_QUALITY]
+            )
+        except cv2.error as exc:
+            raise VisionProviderError(
+                "The analysis image could not be encoded as JPEG.",
+                code="image_encode_failed",
+            ) from exc
+        if not encoded_ok:
+            raise VisionProviderError(
+                "The analysis image could not be encoded as JPEG.",
+                code="image_encode_failed",
+            )
+        encoded = resized_encoded.tobytes()
+        media_type = "image/jpeg"
 
     return PreparedAnalysisImage(
-        jpeg=encoded.tobytes(),
+        encoded=encoded,
+        media_type=media_type,
         original_width=original_width,
         original_height=original_height,
         transmitted_width=transmitted_width,
@@ -207,7 +217,7 @@ class ModelDeckProvider:
     async def analyse_scene(self, image: bytes, question: str) -> SceneAnalysis:
         started = time.perf_counter()
         prepared = prepare_analysis_image(image, self.analysis_max_edge)
-        encoded = base64.b64encode(prepared.jpeg).decode("ascii")
+        encoded = base64.b64encode(prepared.encoded).decode("ascii")
         payload = {
             "model": self.model,
             "messages": [
@@ -216,7 +226,9 @@ class ModelDeckProvider:
                     "content": [
                         {
                             "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{encoded}"},
+                            "image_url": {
+                                "url": f"data:{prepared.media_type};base64,{encoded}"
+                            },
                         },
                         {"type": "text", "text": build_prompt(question)},
                     ],
@@ -312,7 +324,7 @@ class ModelDeckProvider:
                 len(image),
                 prepared.transmitted_width,
                 prepared.transmitted_height,
-                len(prepared.jpeg),
+                len(prepared.encoded),
                 prepared.resize_ms,
                 (time.perf_counter() - started) * 1000,
             )

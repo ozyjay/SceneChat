@@ -26,7 +26,7 @@
 
 **Goal:** use a multimodal model through the ModelDeck gateway without affecting detection.
 **Delivered foundation:** `ModelDeckProvider`, dedicated gateway vision routing, the pinned `scenechat-vision` alias and `scene-analysis-v1` capability checks, gateway-only URL validation, JPEG/PNG data-URL input, strict structured response validation, prompt/output safeguards, one-request lock, timeout, automatic interval, generation-aware stale success/failure rejection, explicit replay fallback, and detector-only degradation without provider failover.
-**Hardware gate:** exact gateway image request and combined-load measurements in `MODEL_COMPATIBILITY.md`. Request shape, route/capability readiness, concurrency, reset/privacy invalidation, timeout, explicit fallback and outage degradation have offline coverage. The 23 July physical gateway attempt failed its latency and structured-output gates; rerun it after correcting or replacing the production candidate. The two-hour camera-plus-model burn-in also remains.
+**Hardware gate:** exact gateway image request and combined-load measurements in `MODEL_COMPATIBILITY.md`. Request shape, route/capability readiness, concurrency, reset/privacy invalidation, timeout, explicit fallback and outage degradation have offline coverage. ModelDeck promoted the runtime-package-0.2.2, 140-visual-token candidate in Open2026 revision 35 under a recorded operator exception after 70 schema-valid isolated requests. SceneChat synchronised the revised exact prompt and passed all ten measured structured requests after preserving the prepared PNG, but its 9.20-second median missed the 8-second application target; its 10.17-second p95 passed. The two-hour camera-plus-model burn-in also remains.
 
 ## Phase 4 — Open Day interface
 
@@ -39,11 +39,11 @@
 
 **Goal:** production rehearsal and freeze.  
 **Delivered foundation:** one deterministic `.env`-driven launcher, privacy defaults, graceful resource release, and offline tests.
-**Remaining model-focused gate:** resolve the Qwen3.5 latency and 512-token structured-output failure, rerun the complete ten-request acceptance, then freeze the production fingerprint. The gateway-outage, reset-during-inference and privacy-during-inference drills passed on 23 July. The physical camera-disconnect drill, 60-minute camera test, two-hour camera-plus-model burn-in, cold reboot and staff rehearsal remain.
+**Remaining model-focused gate:** resolve or explicitly waive SceneChat's 9.20-second median result against the frozen revision-35 fingerprint. Reset-during-inference and privacy-during-inference passed against the promoted Worker; the earlier gateway-outage drill has not been repeated against it. The physical camera-disconnect drill, 60-minute camera test, two-hour camera-plus-model burn-in, cold reboot and staff rehearsal remain.
 
 ## Risks and go/no-go rules
 
-- **Strix Halo runtime:** treat the prepared ModelDeck trusted-runtime Worker as unverified until the current physical acceptance and burn-in evidence is recorded; keep replay and detector-only ready.
+- **Strix Halo runtime:** ModelDeck promoted the Worker under a documented latency and qualification exception; treat the SceneChat end-to-end route as unverified until its current acceptance and burn-in evidence is recorded, and keep replay and detector-only ready.
 - **Unified-memory pressure:** use E2B first, restrict model context, record memory before and during combined use, and avoid concurrent analyses.
 - **Camera enumeration:** select named devices in operator controls and rehearse reconnect; camera failure must route to replay.
 - **Detector licence/performance:** deferred while the live model path uses no detector; reassess before re-enabling live object detection.
