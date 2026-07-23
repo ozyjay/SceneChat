@@ -26,7 +26,7 @@
 
 **Goal:** use a multimodal model through the ModelDeck gateway without affecting detection.
 **Delivered foundation:** `ModelDeckProvider`, dedicated gateway vision routing, the pinned `scenechat-vision` alias and `scene-analysis-v1` capability checks, gateway-only URL validation, JPEG/PNG data-URL input, strict structured response validation, prompt/output safeguards, one-request lock, timeout, automatic interval, generation-aware stale success/failure rejection, explicit replay fallback, and detector-only degradation without provider failover.
-**Hardware gate:** exact gateway image request and combined-load measurements in `MODEL_COMPATIBILITY.md`. Request shape, route/capability readiness, concurrency, reset/privacy invalidation, timeout, explicit fallback and outage degradation have offline coverage. The physical ModelDeck gateway probe and two-hour camera-plus-model burn-in remain.
+**Hardware gate:** exact gateway image request and combined-load measurements in `MODEL_COMPATIBILITY.md`. Request shape, route/capability readiness, concurrency, reset/privacy invalidation, timeout, explicit fallback and outage degradation have offline coverage. The 23 July physical gateway attempt failed its latency and structured-output gates; rerun it after correcting or replacing the production candidate. The two-hour camera-plus-model burn-in also remains.
 
 ## Phase 4 — Open Day interface
 
@@ -39,7 +39,7 @@
 
 **Goal:** production rehearsal and freeze.  
 **Delivered foundation:** one deterministic `.env`-driven launcher, privacy defaults, graceful resource release, and offline tests.
-**Remaining model-focused gate:** freeze the prepared Qwen3.5 0.8B, 280vt mock Worker fingerprint, run the physical camera-disconnect and gateway-outage drills, complete the 60-minute camera test and two-hour camera-plus-model burn-in, cold reboot, and staff rehearsal. The earlier direct-runtime outage drill does not substitute for the ModelDeck gateway drill.
+**Remaining model-focused gate:** resolve the Qwen3.5 latency and 512-token structured-output failure, rerun the complete ten-request acceptance, then freeze the production fingerprint. The gateway-outage, reset-during-inference and privacy-during-inference drills passed on 23 July. The physical camera-disconnect drill, 60-minute camera test, two-hour camera-plus-model burn-in, cold reboot and staff rehearsal remain.
 
 ## Risks and go/no-go rules
 

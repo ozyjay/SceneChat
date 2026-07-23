@@ -479,7 +479,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(423, "Privacy screen active")
         if state.internal_mode == "detector-only":
             raise HTTPException(409, "Scene analysis is disabled in detector-only mode")
-        image = request.app.state.camera.latest_jpeg()
+        image = (
+            request.app.state.camera.latest_jpeg()
+            if state.camera_running
+            else None
+        )
         if not image:
             image = request.app.state.registry.image_path(state.replay_scenario).read_bytes()
         try:

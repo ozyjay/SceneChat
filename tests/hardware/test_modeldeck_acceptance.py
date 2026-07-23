@@ -243,3 +243,60 @@ async def test_reset_rejects_a_real_modeldeck_result_made_stale():
                 with pytest.raises(asyncio.CancelledError):
                     await request_task
             await client.post("/api/analysis/clear")
+
+
+@pytest.mark.anyio
+async def test_privacy_rejects_a_real_modeldeck_result_made_stale():
+    """Privacy during real inference must hide the frame and discard the result."""
+    await _assert_modeldeck_route_ready()
+    timeout = httpx.Timeout(REQUEST_TIMEOUT_SECONDS)
+    async with httpx.AsyncClient(base_url=SCENECHAT_URL, timeout=timeout) as client:
+        initial = AppState.model_validate((await client.get("/api/state")).json())
+        if not initial.provider_available:
+            pytest.skip("the primary ModelDeck route check marked the provider unavailable")
+        _assert_safe_preconditions(initial)
+        await _assert_raster_prepared_frame(client)
+        await client.post("/api/analysis/clear")
+
+        request_task = asyncio.create_task(
+            client.post("/api/analyse", json={"question": "Describe the scene."})
+        )
+        observed_in_progress = False
+        try:
+            for _ in range(50):
+                state = AppState.model_validate((await client.get("/api/state")).json())
+                if state.analysis_in_progress:
+                    observed_in_progress = True
+                    break
+                if request_task.done():
+                    break
+                await asyncio.sleep(0.1)
+
+            if not observed_in_progress:
+                pytest.skip(
+                    "the model completed before privacy could invalidate the request"
+                )
+
+            privacy_response = await client.post(
+                "/api/privacy", json={"enabled": True}
+            )
+            assert privacy_response.status_code == 200
+            assert privacy_response.json()["privacy_screen"] is True
+            assert (await client.get("/api/frame")).status_code == 423
+
+            response = await request_task
+            assert response.status_code == 200
+            assert response.json()["applied"] is False
+
+            final = AppState.model_validate((await client.get("/api/state")).json())
+            assert final.privacy_screen is True
+            assert final.scene_analysis is None
+            assert final.analysis_in_progress is False
+            assert final.last_model_latency_ms is None
+        finally:
+            if not request_task.done():
+                request_task.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await request_task
+            await client.post("/api/privacy", json={"enabled": False})
+            await client.post("/api/analysis/clear")

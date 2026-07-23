@@ -105,6 +105,32 @@ async def test_replay_analysis_and_reset_flow():
 
 
 @pytest.mark.anyio
+async def test_analysis_ignores_buffered_camera_frame_after_camera_stops(monkeypatch):
+    class CapturingProvider:
+        def __init__(self):
+            self.image = None
+
+        async def analyse_scene(self, image, question):
+            self.image = image
+            return SceneAnalysis(summary="Prepared replay scene.", provider="replay")
+
+    async with AppClient() as client:
+        provider = CapturingProvider()
+        app = client._transport.app
+        app.state.providers["replay"] = provider
+        app.state.analysis.providers["replay"] = provider
+        monkeypatch.setattr(app.state.camera, "latest_jpeg", lambda: b"stale-camera-frame")
+
+        response = await client.post(
+            "/api/analyse", json={"question": "Describe the scene."}
+        )
+
+        assert response.status_code == 200
+        prepared_image = app.state.registry.image_path("demo_booth").read_bytes()
+        assert provider.image == prepared_image
+
+
+@pytest.mark.anyio
 async def test_clear_description_invalidates_in_flight_generation():
     async with AppClient() as client:
         before = (await client.get("/api/state")).json()["generation"]
