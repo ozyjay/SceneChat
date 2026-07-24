@@ -58,8 +58,8 @@ async def test_health_public_state_and_pages():
         assert 'id="autoQuestionChoices"' in public.text
         assert 'id="autoScheduleStatus"' in public.text
         assert 'id="headerPrivacy"' in public.text
-        assert '/assets/styles.css?v=15' in public.text
-        assert '/assets/public.js?v=20' in public.text
+        assert '/assets/styles.css?v=16' in public.text
+        assert '/assets/public.js?v=21' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="learnedPromptChips"' in public.text
         assert 'id="clearLearnedPrompts"' in public.text
@@ -69,6 +69,7 @@ async def test_health_public_state_and_pages():
         assert 'id="analysisStatusTitle"' in public.text
         assert 'id="analysisStatusDetail"' in public.text
         assert 'id="detectorLegend"' in public.text
+        assert "teal strong · gold possible · red uncertain" in public.text
         assert 'id="analysisObjects"' in public.text
         assert 'Scene model mentioned' in public.text
         assert 'Fast object detector' in public.text
@@ -83,13 +84,17 @@ async def test_health_public_state_and_pages():
         assert health.json()["status"] == "ok"
         assert (await client.get("/api/diagnostics")).status_code == 200
         assert (await client.get("/api/frame")).status_code == 200
-        script = await client.get("/assets/public.js?v=20")
+        script = await client.get("/assets/public.js?v=21")
         assert "Automatic scene analysis enabled" in script.text
         assert "Automatic analysis paused" in script.text
         assert "Automatic scene analysis is paused until the camera starts again" in script.text
         assert "Object detection updated" in script.text
         assert "Privacy screen activated" in script.text
         assert "dismissNotifications" in script.text
+        assert "{minimum: 0.75, key: 'strong', label: 'strong match'}" in script.text
+        assert "{minimum: 0.55, key: 'possible', label: 'possible match'}" in script.text
+        assert "label: 'uncertain match'" in script.text
+        assert "This score is not a probability." in script.text
 
 
 @pytest.mark.anyio

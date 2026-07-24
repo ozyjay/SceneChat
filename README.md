@@ -96,6 +96,8 @@ The **Object detector model** selector pauses and restarts an active camera whil
 
 `DETECTOR_MAX_FPS` limits expensive detector inference independently of camera capture. The default of 5 reuses the latest boxes between inference passes, substantially reducing CPU preprocessing without reducing the camera refresh rate.
 
+Public detector boxes use qualitative confidence bands instead of presenting the detector score as a probability: **strong match** at 75% or above, **possible match** from 55% to below 75%, and **uncertain match** below 55%. Teal, gold and red boxes make those bands visible at a glance. The raw detector score remains available in the label tooltip for diagnostics and is explicitly described as not being a probability.
+
 Download or re-verify the detector artefacts at any time with:
 
 ```powershell

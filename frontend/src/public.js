@@ -20,6 +20,11 @@ const promptLearningReasonLabels = {
   weapon_or_drug: 'weapons or regulated substances',
   model_safety_note: 'model safety notes',
 };
+const detectionConfidenceBands = [
+  {minimum: 0.75, key: 'strong', label: 'strong match'},
+  {minimum: 0.55, key: 'possible', label: 'possible match'},
+  {minimum: 0, key: 'uncertain', label: 'uncertain match'},
+];
 const $ = (id) => document.getElementById(id);
 
 function dismissNotifications() {
@@ -64,6 +69,10 @@ async function post(path, body) {
   });
 }
 
+function detectionConfidenceBand(confidence) {
+  return detectionConfidenceBands.find(band => confidence >= band.minimum);
+}
+
 function renderDetections(detections) {
   const layer = $('detectionLayer');
   layer.replaceChildren();
@@ -74,8 +83,12 @@ function renderDetections(detections) {
     box.style.top = `${detection.y * 100}%`;
     box.style.width = `${detection.width * 100}%`;
     box.style.height = `${detection.height * 100}%`;
+    const confidenceBand = detectionConfidenceBand(detection.confidence);
+    box.classList.add(`confidence-${confidenceBand.key}`);
     const label = document.createElement('span');
-    label.textContent = `${detection.label} · about ${Math.round(detection.confidence * 100)}%`;
+    const score = Math.round(detection.confidence * 100);
+    label.textContent = `${detection.label} · ${confidenceBand.label}`;
+    label.title = `Detector score: ${score}%. This score is not a probability.`;
     box.append(label);
     layer.append(box);
   }

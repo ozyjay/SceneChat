@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SceneChat</title>
-  <link rel="stylesheet" href="/assets/styles.css?v=15">
+  <link rel="stylesheet" href="/assets/styles.css?v=16">
 </head>
 <body class="public-page">
   <header class="topbar">
@@ -25,7 +25,7 @@
       <div id="visualFrame" class="visual-frame">
         <img id="sceneImage" src="/api/frame" alt="Current SceneChat scene">
         <div id="detectionLayer" class="detection-layer" aria-hidden="true"></div>
-        <div id="detectorLegend" class="system-legend detector-legend">Teal boxes · fast object detector</div>
+        <div id="detectorLegend" class="system-legend detector-legend">Box confidence · teal strong · gold possible · red uncertain</div>
         <div id="privacyHolding" class="privacy-holding" hidden>
           <div class="privacy-symbol">◉</div>
           <h2>Camera hidden</h2>
@@ -215,6 +215,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <button id="toast" class="toast" type="button" aria-live="polite" aria-label="Dismiss notification"></button>
-  <script src="/assets/public.js?v=20" defer></script>
+  <script src="/assets/public.js?v=21" defer></script>
 </body>
 </html>
