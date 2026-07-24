@@ -122,7 +122,7 @@ class ModelDeckProvider:
         gateway_url: str,
         model: str,
         timeout: float,
-        max_tokens: int = 512,
+        max_tokens: int = 1024,
         health_timeout: float = 2.0,
         *,
         analysis_max_edge: int = 0,

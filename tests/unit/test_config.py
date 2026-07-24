@@ -12,7 +12,7 @@ def test_safe_defaults_do_not_store_frames():
     assert settings.scenechat_port == 3700
     assert settings.model_provider == "fallback"
     assert settings.vision_analysis_max_edge == 0
-    assert settings.vision_max_tokens == 512
+    assert settings.vision_max_tokens == 1024
 
 
 def test_default_detector_allowlist_contains_common_objects_within_active_limit():
@@ -70,10 +70,17 @@ def test_modeldeck_model_must_use_scenechat_vision_alias():
         Settings(modeldeck_model="text-diffusion")
 
 
-@pytest.mark.parametrize("value", [0, 127, 513])
+@pytest.mark.parametrize("value", [0, 127, 1025])
 def test_vision_output_limit_has_safe_bounds(value):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, vision_max_tokens=value)
+
+
+@pytest.mark.parametrize("value", [128, 512, 1024])
+def test_vision_output_limit_accepts_worker_supported_values(value):
+    settings = Settings(_env_file=None, vision_max_tokens=value)
+
+    assert settings.vision_max_tokens == value
 
 
 @pytest.mark.parametrize("value", [1, 255, 1281, 4096])

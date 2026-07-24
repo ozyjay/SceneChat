@@ -14,7 +14,7 @@ Last updated: 24 July 2026. Measurements marked **not run** must be completed on
 | ModelDeck runtime package | 0.2.2 |
 | Visual-token budget | 140 |
 | Worker completion ceiling | 1,024 |
-| SceneChat request ceiling | 512 |
+| SceneChat request ceiling | 1,024 |
 | SceneChat gateway | `http://127.0.0.1:8600` |
 | Preferred endpoint | `POST /v1/vision/analyse` |
 
@@ -50,13 +50,13 @@ Record one complete immutable fingerprint and the following results:
 | Result | Value |
 |---|---|
 | ModelDeck version and active Event revision | ModelDeck 0.1.0 at `278f436637cf3e003bf70645c281135455460034`; `Open2026` revision 35 |
-| Worker definition/runtime fingerprint | immutable Worker `3ad2f88d-8936-4ffc-ac63-6b5e6543d4ed`; `qwen35-vision-language-transformers-rocm`; runtime package 0.2.2; bfloat16; 140 visual tokens; 1,024 Worker completion ceiling; SceneChat requests at most 512 |
+| Worker definition/runtime fingerprint | immutable Worker `3ad2f88d-8936-4ffc-ac63-6b5e6543d4ed`; `qwen35-vision-language-transformers-rocm`; runtime package 0.2.2; bfloat16; 140 visual tokens; 1,024 Worker completion ceiling; SceneChat requests at most 1,024 |
 | Exact model revision and artefact fingerprint | `Qwen/Qwen3.5-0.8B@2fc06364715b967f1860aea9cf38778875588b17`; locally cached source model |
 | Gateway alias, protocol and capabilities | passed for `scenechat-vision`, `scene-analysis-v1`, `image_input` and `structured_output`; cloud fallback disabled |
 | ModelDeck isolated qualification | passed functionally: all 70 measured responses were schema-valid with zero failures or length finishes; ModelDeck recorded 8.76-second p50 and 10.07-second p95 and promoted the Worker under an explicit operator exception to the 8-second median target |
 | SceneChat prepared JPEG/PNG request and strict schema | passed after preserving the validated 59,214-byte PNG when resizing is disabled: two warm-ups and all ten measured requests were schema-valid with zero failures |
 | SceneChat ten-request median/p95 and failure count | latency gate failed: 9,200.8 ms end-to-end median and 10,171.4 ms nearest-rank p95; the 8,000 ms median target failed and the 12,000 ms p95 target passed |
-| Prompt/completion token metrics and limit hits | 518 prompt-token median; 315.5 completion-token median; 300–358 completion-token range; zero 512-token limit hits; 35.03 observed completion tokens/second median |
+| Prompt/completion token metrics and limit hits | Qualification run: 518 prompt-token median; 315.5 completion-token median; 300–358 completion-token range; zero 512-token limit hits; 35.03 observed completion tokens/second median. Subsequent live-camera operation produced repeated 512-token truncations, so SceneChat now uses the Worker's 1,024-token ceiling; physical revalidation is pending. |
 | Gateway-outage/Worker-not-ready drill | passed against revision 34: HTTP 503 was sanitised, `modeldeck` remained selected, the previous valid result was retained, the app degraded to detector-only mode, and explicit Worker restart/readiness recovery succeeded; **not rerun** against revision 35 |
 | Reset during inference | passed against revision 35; the eventual result was discarded as stale |
 | Privacy during inference | passed against revision 35; `/api/frame` hid the image immediately and the eventual result was discarded as stale |
@@ -81,8 +81,8 @@ valid. The recorded 8.76-second median exceeded the standard 8-second target, an
 manual review, combined two-hour load and drills were not completed for that Worker.
 On 24 July the operator explicitly accepted those exceptions and promoted it in
 Open2026 revision 35. ModelDeck's native and gateway synthetic PNG smoke tests passed,
-and SceneChat's application-level run now confirms the revised exact prompt, strict
-parser and 512-token request ceiling. The first SceneChat attempt re-encoded the
+and SceneChat's application-level run confirmed the revised exact prompt, strict
+parser and then-current 512-token request ceiling. The first SceneChat attempt re-encoded the
 prepared PNG to JPEG and produced a deterministic schema violation for the
 closest-object question. Preserving validated JPEG or PNG bytes when resizing is
 disabled made all measured requests valid. The completed run still failed the

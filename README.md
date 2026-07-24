@@ -70,12 +70,12 @@ MODELDECK_URL=http://127.0.0.1:8600
 MODELDECK_MODEL=scenechat-vision
 VISION_REQUEST_TIMEOUT_SECONDS=20
 VISION_ANALYSIS_MAX_EDGE=0
-VISION_MAX_TOKENS=512
+VISION_MAX_TOKENS=1024
 ```
 
 Invalid application ports and ModelDeck management, legacy direct-model, non-loopback, or Worker URLs are rejected at start-up. No ModelDeck secret is configured in SceneChat. Storage of frames or video is also rejected by configuration.
 
-`VISION_MAX_TOKENS` limits the complete structured scene-description response. SceneChat deliberately requests at most 512 tokens even though the promoted Worker permits a 1,024-token hard ceiling. The qualified responses remained below 512 tokens, so this application-side bound retains truncation headroom without adopting the Worker's full failure ceiling. Lower values down to 128 remain valid for deliberate latency experiments, but can truncate the JSON response.
+`VISION_MAX_TOKENS` limits the complete structured scene-description response. The Open Day profile requests up to 1,024 tokens, matching the promoted Worker's hard ceiling, after live camera scenes repeatedly reached the former 512-token limit before completing valid JSON. Lower values down to 128 remain valid for deliberate latency experiments, but can truncate the JSON response. The strict response schema still bounds displayed content independently of the generation allowance.
 
 `VISION_ANALYSIS_MAX_EDGE` is an optional transport and experimentation control for only the in-memory image copy sent to ModelDeck. The default `0` disables manual resizing and preserves the validated JPEG or PNG bytes. Experimental limits from 256 to 1280 pixels are accepted. A value of 512 converts a 1280×720 frame to 512×288 and a 720×1280 frame to 288×512 without cropping, padding, stretching or upscaling. SceneChat uses OpenCV `INTER_AREA` interpolation when shrinking and re-encodes only the resized request copy as JPEG at quality 82. The original camera frame remains unchanged for browser display and object detection, and neither copy is written to disk.
 

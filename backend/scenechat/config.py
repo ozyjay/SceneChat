@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     modeldeck_model: str = MODELDECK_MODEL_ALIAS
     vision_request_timeout_seconds: float = Field(default=20, gt=0, le=120)
     vision_analysis_max_edge: int = Field(default=0, ge=0, le=1280)
-    vision_max_tokens: int = Field(default=512, ge=128, le=512)
+    vision_max_tokens: int = Field(default=1024, ge=128, le=1024)
     auto_analyse: bool = False
     auto_analyse_interval_seconds: float = Field(default=90, ge=20, le=300)
 
