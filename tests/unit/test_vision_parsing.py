@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from scenechat.detection.prompt_learning import sanitise_scene_analysis
 from scenechat.vision.base import VisionProviderError, parse_scene_analysis
 
 
@@ -48,6 +49,24 @@ def test_rejects_extra_operational_fields_and_unbounded_list_text():
     too_long = valid_payload() | {"relationships": ["x" * 181]}
     with pytest.raises(VisionProviderError, match="invalid structured response"):
         parse_scene_analysis(json.dumps(too_long), "modeldeck")
+
+
+def test_non_displayed_safety_note_is_replaced_before_shared_state():
+    payload = valid_payload() | {
+        "safety_notes": [
+            "No ethnicity, religion, health, or other sensitive attribute was inferred."
+        ]
+    }
+
+    parsed = parse_scene_analysis(json.dumps(payload), "modeldeck")
+    sanitised = sanitise_scene_analysis(parsed)
+
+    assert sanitised.objects == []
+    assert sanitised.safety_notes == [
+        "Some structured objects were withheld by the safety policy."
+    ]
+    assert "ethnicity" not in sanitised.model_dump_json()
+    assert "religion" not in sanitised.model_dump_json()
 
 
 @pytest.mark.parametrize(

@@ -95,7 +95,9 @@ def _validate_public_output(payload: SceneAnalysisPayload) -> None:
             *(item.approximate_location for item in payload.objects),
             *payload.relationships,
             *payload.uncertainties,
-            *payload.safety_notes,
+            # Model-generated safety notes are never displayed verbatim.
+            # The analysis sanitiser replaces any non-empty list with one
+            # fixed public message before the result can enter shared state.
         ]
     )
     if any(
