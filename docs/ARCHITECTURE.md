@@ -24,7 +24,7 @@ validated state store -> SSE updates -> unified visitor/operator screen
 
 ## Failure isolation
 
-Provider failure leaves the previous valid description in place, exposes a sanitised staff error, and degrades a ModelDeck session to detector-only mode without changing the selected provider. Readiness distinguishes an unreachable gateway, an unpublished route, a Worker that is not ready, and missing capabilities. Repeated camera read failures terminate capture, clear the in-memory frame and detections, and prompt the operator to reconnect and restart; replay remains available. The privacy flag hides the `/api/frame` response and public visual immediately and invalidates an in-flight result. Reset never waits for model completion.
+Provider failure leaves the previous valid description in place and exposes a sanitised staff error. Three consecutive ModelDeck request failures degrade the session to detector-only mode without changing the selected provider; a local readiness monitor restores the operator's requested mode when the route recovers. Readiness distinguishes an unreachable gateway, an unpublished route, a Worker that is not ready, and missing capabilities. Repeated camera read failures terminate capture, clear the in-memory frame and detections, and prompt the operator to reconnect and restart; replay remains available. The privacy flag hides the `/api/frame` response and public visual immediately and invalidates an in-flight result. Reset never waits for model completion.
 
 ## Runtime ownership
 

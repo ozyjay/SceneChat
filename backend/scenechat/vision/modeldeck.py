@@ -240,10 +240,12 @@ class ModelDeckProvider:
             "stream": False,
         }
         outcome = "cancelled"
+        http_status: int | None = None
         try:
             response = await self._client.post(
                 f"{self.gateway_url}/v1/vision/analyse", json=payload
             )
+            http_status = response.status_code
             if response.status_code == 503:
                 try:
                     error_payload = response.json()
@@ -317,7 +319,7 @@ class ModelDeckProvider:
                 "ModelDeck scene analysis outcome=%s original_width=%d "
                 "original_height=%d original_bytes=%d transmitted_width=%d "
                 "transmitted_height=%d transmitted_bytes=%d resize_ms=%.1f "
-                "provider_latency_ms=%.1f",
+                "provider_latency_ms=%.1f http_status=%s",
                 outcome,
                 prepared.original_width,
                 prepared.original_height,
@@ -327,6 +329,7 @@ class ModelDeckProvider:
                 len(prepared.encoded),
                 prepared.resize_ms,
                 (time.perf_counter() - started) * 1000,
+                http_status if http_status is not None else "none",
             )
 
 

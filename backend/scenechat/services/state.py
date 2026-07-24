@@ -60,6 +60,7 @@ class StateStore:
                 if analysis.provider == "modeldeck"
                 else "Provider is available."
             )
+            state.provider_consecutive_failures = 0
             state.staff_error = None
             applied = True
 

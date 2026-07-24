@@ -129,7 +129,7 @@
         <div id="autoScheduleStatus" class="setting-status">Automatic analysis is off</div>
         <label>Question for Run now<select id="questionSelect"></select></label>
         <div class="button-row"><button id="triggerAnalysis" class="primary-button">Run analysis now</button><button id="clearAnalysis" class="secondary-button">Clear description</button></div>
-        <div class="inline-fields"><label class="check-label"><input id="autoEnabled" type="checkbox"> Run automatically</label><label>Interval (seconds)<input id="autoInterval" type="number" min="20" max="60" value="20"></label></div>
+        <div class="inline-fields"><label class="check-label"><input id="autoEnabled" type="checkbox"> Run automatically</label><label>Cooldown after completion (seconds)<input id="autoInterval" type="number" min="20" max="300" value="90"></label></div>
         <fieldset class="auto-question-options">
           <legend>Questions used automatically</legend>
           <div class="prompt-selection-toolbar">
@@ -143,7 +143,7 @@
         </fieldset>
         <p id="autoSchedulePending" class="pending-change" hidden></p>
         <button id="applyAuto" class="secondary-button">Apply automatic schedule</button>
-        <p>Automatic runs randomly rotate through the selected curated questions and never run more often than every 20 seconds.</p>
+        <p>Automatic runs randomly rotate through the selected curated questions and wait for the configured cooldown after each run completes.</p>
       </section>
 
       <section class="control-panel detection-panel">
@@ -215,6 +215,6 @@
     <div><strong>Privacy</strong><p>This camera feed is processed live and is not stored by default.</p></div>
   </footer>
   <button id="toast" class="toast" type="button" aria-live="polite" aria-label="Dismiss notification"></button>
-  <script src="/assets/public.js?v=19" defer></script>
+  <script src="/assets/public.js?v=20" defer></script>
 </body>
 </html>

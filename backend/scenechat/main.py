@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import mimetypes
 import random
 import resource
@@ -50,6 +51,8 @@ from scenechat.vision.base import ProviderStatus
 
 FRONTEND = ROOT / "frontend"
 PROMPTABLE_DETECTOR_BACKENDS = {"auto", "yoloe", "yoloworld"}
+MODELDECK_RECOVERY_CHECK_SECONDS = 30
+logger = logging.getLogger(__name__)
 
 
 class AnalyseRequest(BaseModel):
@@ -79,7 +82,7 @@ class DetectorPromptRequest(BaseModel):
 
 class AutoAnalyseRequest(BaseModel):
     enabled: bool
-    interval_seconds: float = Field(default=20, ge=20, le=60)
+    interval_seconds: float = Field(default=90, ge=20, le=300)
     questions: list[str] | None = Field(default=None, min_length=1, max_length=20)
 
 
@@ -231,6 +234,13 @@ def _degrade_modeldeck_state(state: AppState, detector_backend: str) -> None:
     state.mode = "Live camera only" if detector_backend == "none" else "Detector only"
 
 
+def _restore_desired_mode(state: AppState, detector_backend: str) -> None:
+    if state.desired_mode == "detector-only":
+        return
+    state.internal_mode = state.desired_mode
+    state.mode = _public_mode(state.desired_mode, detector_backend)
+
+
 def _apply_provider_status(
     state: AppState,
     provider_name: str,
@@ -247,8 +257,11 @@ def _apply_provider_status(
     state.provider_status_code = status.code
     state.provider_status_message = status.message
     state.staff_error = None if status.available else status.message
-    if provider_name == "modeldeck" and not status.available:
-        _degrade_modeldeck_state(state, detector_backend)
+    if provider_name == "modeldeck":
+        if status.available:
+            _restore_desired_mode(state, detector_backend)
+        else:
+            _degrade_modeldeck_state(state, detector_backend)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -286,6 +299,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             AppState(
                 mode=initial_public_mode,
                 internal_mode=initial_mode,
+                desired_mode=configured.scenechat_mode,
                 provider=initial_provider,
                 provider_available=initial_status.available,
                 provider_status_code=initial_status.code,
@@ -338,15 +352,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.detector_prompt_lock = asyncio.Lock()
         monitor = asyncio.create_task(_camera_monitor(camera, state))
         automatic = asyncio.create_task(_automatic_analysis(app))
+        provider_recovery = asyncio.create_task(_provider_recovery(app))
         try:
             yield
         finally:
             monitor.cancel()
             automatic.cancel()
+            provider_recovery.cancel()
             with suppress(asyncio.CancelledError):
                 await monitor
             with suppress(asyncio.CancelledError):
                 await automatic
+            with suppress(asyncio.CancelledError):
+                await provider_recovery
             await camera.stop()
             await modeldeck.close()
 
@@ -580,6 +598,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             state.generation += 1
             state.analysis_in_progress = False
             state.internal_mode = payload.mode
+            state.desired_mode = payload.mode
             state.mode = _public_mode(payload.mode, configured.detector_backend)
             state.detections = _detections_for_mode(
                 payload.mode,
@@ -845,23 +864,30 @@ def _automatic_analysis_can_run(state: AppState) -> bool:
     )
 
 
-async def _automatic_analysis(app: FastAPI) -> None:
-    loop = asyncio.get_running_loop()
-    last_started = loop.time()
+async def _automatic_analysis(
+    app: FastAPI,
+    *,
+    monotonic=None,
+    sleep=asyncio.sleep,
+) -> None:
+    now = monotonic or asyncio.get_running_loop().time
+    next_run_at: float | None = None
     while True:
-        await asyncio.sleep(0.5)
+        await sleep(0.5)
         state = await app.state.state_store.snapshot()
         if not _automatic_analysis_can_run(state):
-            last_started = loop.time()
+            next_run_at = None
             continue
-        if loop.time() - last_started < state.auto_analyse_interval_seconds:
+        if next_run_at is None:
+            next_run_at = now() + state.auto_analyse_interval_seconds
             continue
-        last_started = loop.time()
+        if now() < next_run_at:
+            continue
         image = app.state.camera.latest_jpeg()
         if not image:
             # Camera state can change after the scheduler snapshot. Never replace a
             # missing live frame with replay content for an automatic request.
-            last_started = loop.time()
+            next_run_at = now() + state.auto_analyse_interval_seconds
             continue
         try:
             question = _select_automatic_question(
@@ -875,7 +901,59 @@ async def _automatic_analysis(app: FastAPI) -> None:
                     app, app.state.settings, analysis_result
                 )
         except (RuntimeError, ValueError, AnalysisBusy):
-            pass
+            logger.info("Automatic scene-analysis cycle did not complete.")
+        except Exception:
+            # Keep the long-running scheduler alive after an unexpected local
+            # orchestration failure without logging visitor-derived content.
+            logger.error("Automatic scene-analysis scheduler recovered from an error.")
+        finally:
+            completed_state = await app.state.state_store.snapshot()
+            next_run_at = (
+                now() + completed_state.auto_analyse_interval_seconds
+            )
+
+
+async def _provider_recovery(
+    app: FastAPI,
+    *,
+    sleep=asyncio.sleep,
+    check_seconds: float = MODELDECK_RECOVERY_CHECK_SECONDS,
+) -> None:
+    """Restore the requested local mode when a degraded ModelDeck route recovers."""
+    while True:
+        await sleep(check_seconds)
+        current = await app.state.state_store.snapshot()
+        if (
+            current.provider != "modeldeck"
+            or current.provider_available
+            or current.desired_mode == "detector-only"
+        ):
+            continue
+        try:
+            status = await app.state.providers["modeldeck"].health()
+        except Exception:
+            # A readiness probe must not terminate the long-running recovery task.
+            logger.error("ModelDeck recovery check encountered a local error.")
+            continue
+        if not status.available:
+            continue
+
+        def recover_if_still_relevant(state: AppState) -> None:
+            if (
+                state.provider != "modeldeck"
+                or state.provider_available
+                or state.desired_mode == "detector-only"
+            ):
+                return
+            _apply_provider_status(
+                state,
+                "modeldeck",
+                status,
+                app.state.settings.detector_backend,
+                invalidate=False,
+            )
+
+        await app.state.state_store.mutate(recover_if_still_relevant)
 
 
 app = create_app()

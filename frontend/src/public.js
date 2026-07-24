@@ -322,10 +322,10 @@ function renderOperator(next) {
   }
   const questionCount = next.auto_analyse_questions?.length || 0;
   if (next.auto_analyse && !next.camera_running) {
-    $('autoScheduleStatus').textContent = `Automatic analysis paused · start the camera to resume the ${next.auto_analyse_interval_seconds}-second schedule`;
+    $('autoScheduleStatus').textContent = `Automatic analysis paused · start the camera to resume with a ${next.auto_analyse_interval_seconds}-second cooldown`;
   } else {
     $('autoScheduleStatus').textContent = next.auto_analyse
-      ? `Automatic analysis on · every ${next.auto_analyse_interval_seconds} seconds · ${questionCount} questions in rotation`
+      ? `Automatic analysis on · ${next.auto_analyse_interval_seconds}-second cooldown after completion · ${questionCount} questions in rotation`
       : 'Automatic analysis is off';
   }
   updateAutoQuestionControls();
@@ -421,7 +421,7 @@ function render(next) {
   } else {
     $('questionsTitle').textContent = next.auto_analyse ? 'Automatic questions are running' : 'Choose a question';
     $('questionModeHint').textContent = next.auto_analyse
-      ? `SceneChat randomly rotates through ${next.auto_analyse_questions.length} curated questions every ${next.auto_analyse_interval_seconds} seconds.`
+      ? `SceneChat randomly rotates through ${next.auto_analyse_questions.length} curated questions, with a ${next.auto_analyse_interval_seconds}-second cooldown after each result.`
       : 'Select a prepared question to analyse the current scene.';
   }
   $('triggerAnalysis').disabled = next.analysis_in_progress
@@ -565,7 +565,7 @@ function populateOperatorControls(config, initial) {
   }, result => {
     const label = state.cameraLabels.get(String(result.camera_device)) || `Camera ${result.camera_device}`;
     const automatic = result.auto_analyse
-      ? ` Automatic scene analysis resumed; the next run is scheduled in ${result.auto_analyse_interval_seconds} seconds.`
+      ? ` Automatic scene analysis resumed; the next run follows a ${result.auto_analyse_interval_seconds}-second cooldown.`
       : '';
     return `${label} started. Fast object detection is using ${result.detector_model || result.detector_backend}.${automatic}`;
   });
@@ -620,9 +620,9 @@ function populateOperatorControls(config, initial) {
       return 'Automatic scene analysis disabled. Curated questions remain available for manual runs.';
     }
     if (!result.camera_running) {
-      return `Automatic scene analysis configured for every ${result.auto_analyse_interval_seconds} seconds, but paused because the camera is stopped. It will resume after the camera starts.`;
+      return `Automatic scene analysis configured with a ${result.auto_analyse_interval_seconds}-second cooldown, but paused because the camera is stopped. It will resume after the camera starts.`;
     }
-    return `Automatic scene analysis enabled. ${result.auto_analyse_questions.length} curated questions will rotate every ${result.auto_analyse_interval_seconds} seconds.`;
+    return `Automatic scene analysis enabled. ${result.auto_analyse_questions.length} curated questions will rotate with a ${result.auto_analyse_interval_seconds}-second cooldown after each completed run.`;
   });
 }
 

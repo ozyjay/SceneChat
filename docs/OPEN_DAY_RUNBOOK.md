@@ -18,7 +18,7 @@ In **Operator controls**, select the named camera and, when configured, the allo
 
 For YOLOE or YOLO-World, choose an object preset or a small approved prompt set before opening. This becomes the protected operator baseline. If **Learn safe objects from scene analysis this session** is enabled, structured object labels may be appended automatically after conservative filtering, including labels outside the manual allowlist. Review the separate operator-selected and scene-learned lists and their aggregate blocked/capacity counts. Use **Clear learned objects** to retain the scene description while restoring the baseline. **Reset session** also clears learned objects and counters while preserving the latest operator baseline.
 
-When enabling automatic scene analysis, choose its curated question pool and an interval of at least 20 seconds. Confirm that successive requests rotate randomly through that pool. The scheduler avoids an immediate repeat when multiple questions are available and pauses while the camera is stopped or the privacy screen is active. Starting the camera resumes the schedule with a fresh interval countdown.
+When enabling automatic scene analysis, choose its curated question pool and use the 90-second Open Day cooldown unless the validated model profile requires more time. Confirm that successive requests rotate randomly through that pool. The scheduler waits until each request completes before starting its 20-to-300-second cooldown, avoids an immediate repeat when multiple questions are available, and pauses while the camera is stopped or the privacy screen is active. Starting the camera resumes the schedule with a fresh cooldown.
 
 ## Between visitors
 
@@ -33,7 +33,7 @@ Select **Reset session**. Confirm the public description and scene-learned detec
 
 ## Recovery checks
 
-For a model failure, inspect ModelDeck outside public view, start or recover the prepared Worker there, wait for ready, run `scripts/check_modeldeck.ps1`, then select **Check provider readiness** in SceneChat. Reapply `live` mode only after readiness succeeds. Never enter or call a Worker port from SceneChat. There is no cloud or provider failover. For camera failure, stop it before reconnecting, verify the device, then start it again. Replay stays available throughout.
+For a model failure, inspect ModelDeck outside public view, start or recover the prepared Worker there, wait for ready, run `scripts/check_modeldeck.ps1`, then select **Check provider readiness** in SceneChat. A successful readiness check restores the previously requested `live` mode; SceneChat also checks local readiness periodically while degraded. Never enter or call a Worker port from SceneChat. There is no cloud or provider failover. For camera failure, stop it before reconnecting, verify the device, then start it again. Replay stays available throughout.
 
 ## Shutdown
 

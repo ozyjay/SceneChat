@@ -88,12 +88,21 @@ async def test_provider_failure_degrades_modeldeck_without_switching_provider():
     service = AnalysisService(
         store, {"modeldeck": FailingProvider()}, {"Describe the scene."}, 1
     )
+    for expected_failures in range(1, 3):
+        with pytest.raises(RuntimeError, match="temporarily unavailable"):
+            await service.analyse(b"image", "Describe the scene.")
+        state = await store.snapshot()
+        assert state.internal_mode == "live"
+        assert state.provider_consecutive_failures == expected_failures
+
     with pytest.raises(RuntimeError, match="temporarily unavailable"):
         await service.analyse(b"image", "Describe the scene.")
+
     state = await store.snapshot()
     assert state.internal_mode == "detector-only"
     assert state.mode == "Detector only"
     assert state.provider == "modeldeck"
+    assert state.provider_consecutive_failures == 3
     assert "raw internal detail" not in state.staff_error
 
 
@@ -169,8 +178,9 @@ async def test_provider_failure_uses_camera_only_wording_without_detector():
     service = AnalysisService(
         store, {"modeldeck": FailingProvider()}, {"Describe the scene."}, 1
     )
-    with pytest.raises(RuntimeError, match="temporarily unavailable"):
-        await service.analyse(b"image", "Describe the scene.")
+    for _ in range(3):
+        with pytest.raises(RuntimeError, match="temporarily unavailable"):
+            await service.analyse(b"image", "Describe the scene.")
     state = await store.snapshot()
     assert state.internal_mode == "detector-only"
     assert state.mode == "Live camera only"
@@ -191,3 +201,30 @@ async def test_provider_timeout_does_not_leave_analysis_running():
     state = await store.snapshot()
     assert state.analysis_in_progress is False
     assert state.provider_available is False
+    assert state.internal_mode == "live"
+    assert state.provider_consecutive_failures == 1
+
+
+@pytest.mark.anyio
+async def test_successful_analysis_clears_consecutive_provider_failures():
+    class SuccessfulProvider:
+        async def analyse_scene(self, image, question):
+            return SceneAnalysis(summary="The provider recovered.", provider="modeldeck")
+
+    store = StateStore(
+        AppState(
+            provider="modeldeck",
+            internal_mode="live",
+            provider_available=False,
+            provider_consecutive_failures=2,
+        )
+    )
+    service = AnalysisService(
+        store, {"modeldeck": SuccessfulProvider()}, {"Describe the scene."}, 1
+    )
+
+    await service.analyse(b"image", "Describe the scene.")
+
+    state = await store.snapshot()
+    assert state.provider_available is True
+    assert state.provider_consecutive_failures == 0

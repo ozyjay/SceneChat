@@ -59,7 +59,7 @@ async def test_health_public_state_and_pages():
         assert 'id="autoScheduleStatus"' in public.text
         assert 'id="headerPrivacy"' in public.text
         assert '/assets/styles.css?v=15' in public.text
-        assert '/assets/public.js?v=19' in public.text
+        assert '/assets/public.js?v=20' in public.text
         assert 'id="activePromptChips"' in public.text
         assert 'id="learnedPromptChips"' in public.text
         assert 'id="clearLearnedPrompts"' in public.text
@@ -83,7 +83,7 @@ async def test_health_public_state_and_pages():
         assert health.json()["status"] == "ok"
         assert (await client.get("/api/diagnostics")).status_code == 200
         assert (await client.get("/api/frame")).status_code == 200
-        script = await client.get("/assets/public.js?v=19")
+        script = await client.get("/assets/public.js?v=20")
         assert "Automatic scene analysis enabled" in script.text
         assert "Automatic analysis paused" in script.text
         assert "Automatic scene analysis is paused until the camera starts again" in script.text
@@ -203,7 +203,7 @@ async def test_detector_only_disables_analysis():
 
 
 @pytest.mark.anyio
-async def test_automatic_analysis_interval_requires_at_least_twenty_seconds():
+async def test_automatic_analysis_interval_accepts_twenty_to_three_hundred_seconds():
     async with AppClient() as client:
         rejected = await client.post(
             "/api/auto-analyse",
@@ -225,6 +225,18 @@ async def test_automatic_analysis_interval_requires_at_least_twenty_seconds():
         assert accepted.json()["auto_analyse_questions"] == [
             "What objects can you see?"
         ]
+
+        upper_bound = await client.post(
+            "/api/auto-analyse",
+            json={"enabled": True, "interval_seconds": 300},
+        )
+        assert upper_bound.status_code == 200
+
+        too_slow = await client.post(
+            "/api/auto-analyse",
+            json={"enabled": True, "interval_seconds": 300.1},
+        )
+        assert too_slow.status_code == 422
 
         non_curated = await client.post(
             "/api/auto-analyse",
@@ -311,6 +323,38 @@ async def test_provider_recheck_marks_modeldeck_unavailable_without_failover():
         assert checked.json()["provider_status_code"] == "worker_not_ready"
         assert checked.json()["internal_mode"] == "detector-only"
         assert "Start the SceneChat Worker" in checked.json()["staff_error"]
+
+
+@pytest.mark.anyio
+async def test_provider_recheck_restores_the_requested_live_mode():
+    async with AppClient() as client:
+        app = client._transport.app
+
+        async def available():
+            return ProviderStatus(
+                True,
+                "available",
+                "ModelDeck scenechat-vision is ready.",
+            )
+
+        app.state.providers["modeldeck"].health = available
+        await app.state.state_store.mutate(
+            lambda state: (
+                setattr(state, "provider", "modeldeck"),
+                setattr(state, "provider_available", False),
+                setattr(state, "internal_mode", "detector-only"),
+                setattr(state, "desired_mode", "live"),
+                setattr(state, "mode", "Detector only"),
+            )
+        )
+
+        checked = await client.post("/api/provider/check")
+
+        assert checked.status_code == 200
+        assert checked.json()["provider_available"] is True
+        assert checked.json()["internal_mode"] == "live"
+        assert checked.json()["desired_mode"] == "live"
+        assert checked.json()["mode"] == "Combined"
 
 
 @pytest.mark.anyio

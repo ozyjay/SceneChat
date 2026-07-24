@@ -14,7 +14,7 @@ Application modes are `development`, `live`, `detector-only`, `mock`, and `repla
 - `replay` and `fallback` run without a live model;
 - `mock` is retained for deterministic development and tests.
 
-SceneChat never switches providers automatically. A ModelDeck failure keeps ModelDeck selected, retains the previous valid description, and degrades the app to camera/detector-only operation until staff explicitly recover or select an offline provider.
+SceneChat never switches providers automatically. A ModelDeck failure keeps ModelDeck selected and retains the previous valid description. Three consecutive request failures degrade the app to camera/detector-only operation; local readiness recovery restores the operator's requested mode without selecting another provider.
 
 ## Quick start
 
@@ -108,7 +108,9 @@ Operators select a protected baseline from the configured vocabulary for either 
 
 The active limit is 20 prompts. Baseline prompts are never evicted; the oldest learned prompt is replaced when needed, or learning is skipped when the baseline fills the limit. Manual application clears learned prompts. Learned prompts are held only in memory, work with both YOLOE and YOLO-World, survive detector switching, and are removed by **Clear learned objects**, **Reset session**, or app restart.
 
-When automatic scene analysis is enabled, each interval randomly selects from the operator's chosen pool of version-controlled curated questions. It avoids immediately repeating the selected question when more than one choice is available, enforces a minimum 20-second interval, and pauses while the camera is stopped or privacy mode is active. Starting the camera begins a fresh interval countdown. Manual question selection is unchanged.
+When automatic scene analysis is enabled, each run randomly selects from the operator's chosen pool of version-controlled curated questions. It avoids immediately repeating the selected question when more than one choice is available, then waits for the configured 20-to-300-second cooldown after the run completes. The Open Day default is 90 seconds. Scheduling pauses while the camera is stopped or privacy mode is active, and starting the camera begins a fresh cooldown. Manual analysis remains available in operator controls.
+
+A single ModelDeck request failure retains the previous valid description and does not disable further analysis. SceneChat degrades to camera/detector-only mode after three consecutive request failures, checks the local ModelDeck route for recovery, and restores the operator's requested mode when readiness returns. A successful scene analysis clears the consecutive-failure count. SceneChat never fails over to a cloud provider.
 
 Do not promote a model backend to Open Day use until the hardware checks in [MODEL_COMPATIBILITY.md](docs/MODEL_COMPATIBILITY.md) pass.
 

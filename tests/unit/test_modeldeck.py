@@ -395,6 +395,7 @@ async def test_modeldeck_logs_privacy_safe_success_diagnostics(caplog):
     assert "transmitted_width=512 transmitted_height=288 transmitted_bytes=" in caplog.text
     assert "resize_ms=" in caplog.text
     assert "provider_latency_ms=" in caplog.text
+    assert "http_status=200" in caplog.text
     assert "private prompt marker" not in caplog.text
     assert "A prepared scene is visible" not in caplog.text
     assert "base64" not in caplog.text
@@ -426,4 +427,5 @@ async def test_modeldeck_logs_privacy_safe_timeout_diagnostics(caplog):
     assert "transmitted_width=288 transmitted_height=512 transmitted_bytes=" in caplog.text
     assert "resize_ms=" in caplog.text
     assert "provider_latency_ms=" in caplog.text
+    assert "http_status=none" in caplog.text
     assert "private prompt marker" not in caplog.text

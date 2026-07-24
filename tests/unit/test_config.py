@@ -24,11 +24,13 @@ def test_default_detector_allowlist_contains_common_objects_within_active_limit(
     assert len(settings.detector_prompt_allowlist) == 20
 
 
-def test_automatic_analysis_interval_has_a_twenty_second_minimum():
-    assert Settings(_env_file=None).auto_analyse_interval_seconds == 20
+def test_automatic_analysis_interval_defaults_to_ninety_seconds():
+    assert Settings(_env_file=None).auto_analyse_interval_seconds == 90
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None, auto_analyse_interval_seconds=19.9)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, auto_analyse_interval_seconds=300.1)
 
 
 @pytest.mark.parametrize("field", ["store_frames", "store_video"])

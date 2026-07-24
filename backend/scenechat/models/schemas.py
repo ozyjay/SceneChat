@@ -121,10 +121,12 @@ class AppState(BaseModel):
     generation: int = 0
     mode: str = "Prepared demonstration"
     internal_mode: str = "development"
+    desired_mode: str = "development"
     provider: str = "mock"
     provider_available: bool = True
     provider_status_code: str = "available"
     provider_status_message: str = "Provider is available."
+    provider_consecutive_failures: int = 0
     privacy_screen: bool = False
     camera_running: bool = False
     camera_device: int = 0
@@ -145,7 +147,7 @@ class AppState(BaseModel):
     last_model_latency_ms: float | None = None
     analysis_in_progress: bool = False
     auto_analyse: bool = False
-    auto_analyse_interval_seconds: float = 20
+    auto_analyse_interval_seconds: float = 90
     auto_analyse_questions: list[str] = Field(
         default_factory=lambda: ["Describe the scene."]
     )

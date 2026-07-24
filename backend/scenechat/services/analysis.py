@@ -7,6 +7,9 @@ from scenechat.services.state import StateStore
 from scenechat.vision.base import VisionLanguageProvider, VisionProviderError
 
 
+MODELDECK_FAILURE_THRESHOLD = 3
+
+
 class AnalysisBusy(RuntimeError):
     pass
 
@@ -72,7 +75,12 @@ class AnalysisService:
                     state.provider_status_code = status_code
                     state.provider_status_message = staff_message
                     state.staff_error = staff_message
-                    if state.provider == "modeldeck":
+                    state.provider_consecutive_failures += 1
+                    if (
+                        state.provider == "modeldeck"
+                        and state.provider_consecutive_failures
+                        >= MODELDECK_FAILURE_THRESHOLD
+                    ):
                         state.internal_mode = "detector-only"
                         state.mode = (
                             "Live camera only"
