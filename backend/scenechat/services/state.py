@@ -55,8 +55,8 @@ class StateStore:
             state.provider_available = True
             state.provider_status_code = "available"
             state.provider_status_message = (
-                "ModelDeck scenechat-vision is ready with image_input and "
-                "structured_output."
+                "ModelDeck scenechat-vision is ready with scene-analysis-v1, "
+                "image_input and structured_output."
                 if analysis.provider == "modeldeck"
                 else "Provider is available."
             )

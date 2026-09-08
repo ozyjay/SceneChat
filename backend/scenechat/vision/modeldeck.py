@@ -9,7 +9,10 @@ import cv2
 import httpx
 import numpy as np
 
-from scenechat.config import MODELDECK_REQUIRED_CAPABILITIES
+from scenechat.config import (
+    MODELDECK_PROTOCOL_CONTRACT,
+    MODELDECK_REQUIRED_CAPABILITIES,
+)
 from scenechat.models import SceneAnalysis
 from scenechat.vision.base import (
     ProviderStatus,
@@ -142,23 +145,35 @@ class ModelDeckProvider:
 
     async def health(self) -> ProviderStatus:
         try:
-            models_response = await self._client.get(
-                f"{self.gateway_url}/v1/models", timeout=self.health_timeout
+            routes_response = await self._client.get(
+                f"{self.gateway_url}/v1/routes", timeout=self.health_timeout
             )
-            models_response.raise_for_status()
-            models_payload = models_response.json()
-            models = models_payload.get("data") if isinstance(models_payload, dict) else None
-            if not isinstance(models, list):
+            routes_response.raise_for_status()
+            routes_payload = routes_response.json()
+            routes = (
+                routes_payload.get("routes")
+                if isinstance(routes_payload, dict)
+                else None
+            )
+            if not isinstance(routes, list) or any(
+                not isinstance(item, dict) for item in routes
+            ):
                 return ProviderStatus(
                     False,
                     "invalid_health_response",
                     "ModelDeck returned an invalid route status.",
                 )
+            if routes_payload.get("cloud_fallback") is not False:
+                return ProviderStatus(
+                    False,
+                    "cloud_fallback_not_disabled",
+                    "ModelDeck did not confirm that cloud fallback is disabled.",
+                )
             route = next(
                 (
                     item
-                    for item in models
-                    if isinstance(item, dict) and item.get("id") == self.model
+                    for item in routes
+                    if item.get("public_name") == self.model
                 ),
                 None,
             )
@@ -168,16 +183,30 @@ class ModelDeckProvider:
                     "route_not_published",
                     f"ModelDeck has not published the {self.model} route.",
                 )
+            if route.get("protocol_contract") != MODELDECK_PROTOCOL_CONTRACT:
+                return ProviderStatus(
+                    False,
+                    "contract_mismatch",
+                    (
+                        f"ModelDeck route {self.model} does not publish the "
+                        f"{MODELDECK_PROTOCOL_CONTRACT} contract."
+                    ),
+                )
 
             capabilities_response = await self._client.get(
                 f"{self.gateway_url}/v1/capabilities", timeout=self.health_timeout
             )
             capabilities_response.raise_for_status()
             capabilities_payload = capabilities_response.json()
+            if not isinstance(capabilities_payload, dict):
+                return ProviderStatus(
+                    False,
+                    "invalid_health_response",
+                    "ModelDeck returned an invalid capability status.",
+                )
             capabilities = (
                 capabilities_payload.get(self.model)
-                if isinstance(capabilities_payload, dict)
-                else None
+                if isinstance(capabilities_payload, dict) else None
             )
             missing = [
                 capability
@@ -207,7 +236,13 @@ class ModelDeckProvider:
                     "and structured_output."
                 ),
             )
-        except (httpx.HTTPError, ValueError):
+        except ValueError:
+            return ProviderStatus(
+                False,
+                "invalid_health_response",
+                "ModelDeck returned an invalid readiness response.",
+            )
+        except httpx.HTTPError:
             return ProviderStatus(
                 False,
                 "gateway_unavailable",

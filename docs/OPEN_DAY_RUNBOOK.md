@@ -5,8 +5,8 @@
 1. Confirm signs are visible and the camera points only into the demonstration area.
 2. In the ModelDeck repository, run `pwsh -NoProfile -File scripts/check_ports.ps1` and `pwsh -NoProfile -File scripts/check_environment.ps1`.
 3. In that repository, run `pwsh -NoProfile -File scripts/run.ps1 -OpenDay`, then open `http://127.0.0.1:3600`.
-4. Start the promoted Qwen3.5 0.8B ROCm Worker from ModelDeck runtime package 0.2.2 assigned to Open2026 revision 35. Confirm its 140-visual-token budget, then wait for **ready**. ModelDeck owns discovery, credentials, Worker lifecycle and routing.
-5. Return to this repository and run `pwsh -NoProfile -File scripts/check_modeldeck.ps1`. It checks only the gateway on port `8600`, the `scenechat-vision` route, `image_input`, `structured_output`, readiness and disabled cloud fallback.
+4. In ModelDeck's live Routing Profiles view, find the currently published capability with API model ID `scenechat-vision` and protocol `scene-analysis-v1`. Start its configured Worker and wait for **Ready**. Do not select a historical `Open2026` revision by number or change its configured model, image budget, or token budget. ModelDeck owns discovery, credentials, Worker lifecycle and routing.
+5. Return to this repository and run `pwsh -NoProfile -File scripts/check_modeldeck.ps1`. It checks only the gateway on port `8600`: route presence, contract and readiness through `/v1/routes`, capabilities through `/v1/capabilities`, and disabled cloud fallback. The scene route need not appear in `/v1/models`.
 6. Run `pwsh -NoProfile -File scripts/run.ps1`. It starts SceneChat in the background and exits. A failed ModelDeck preflight produces a warning but does not block camera-only, replay or mock operation.
 7. Open `http://127.0.0.1:3700/`, expand **Operator controls**, select **Check provider readiness**, and confirm health, mode, camera, provider and latency. Collapse the panel and use the same page full-screen for visitors.
 

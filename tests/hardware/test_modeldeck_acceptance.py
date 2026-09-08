@@ -63,9 +63,17 @@ async def _assert_raster_prepared_frame(client: httpx.AsyncClient) -> None:
 
 async def _assert_modeldeck_route_ready() -> None:
     async with httpx.AsyncClient(base_url=MODELDECK_URL, timeout=3) as gateway:
-        models = (await gateway.get("/v1/models")).json().get("data", [])
-        route = next((item for item in models if item.get("id") == MODEL_ALIAS), None)
+        routes = (await gateway.get("/v1/routes")).json()
+        route = next(
+            (
+                item
+                for item in routes.get("routes", [])
+                if item.get("public_name") == MODEL_ALIAS
+            ),
+            None,
+        )
         assert route is not None, "ModelDeck has not published scenechat-vision"
+        assert route.get("protocol_contract") == "scene-analysis-v1"
         assert route.get("ready") is True, "start the SceneChat Worker in ModelDeck"
 
         capabilities = (await gateway.get("/v1/capabilities")).json().get(
@@ -74,7 +82,6 @@ async def _assert_modeldeck_route_ready() -> None:
         assert capabilities.get("image_input") is True
         assert capabilities.get("structured_output") is True
 
-        routes = (await gateway.get("/v1/routes")).json()
         assert routes.get("cloud_fallback") is False
 
 

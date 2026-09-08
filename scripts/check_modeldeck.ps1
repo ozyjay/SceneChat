@@ -24,10 +24,16 @@ if ($ModelAlias -ne 'scenechat-vision') {
 }
 
 $BaseUrl = $GatewayUrl.TrimEnd('/')
-$Models = Invoke-RestMethod -Uri "$BaseUrl/v1/models" -Method Get -TimeoutSec 3
-$Route = @($Models.data) | Where-Object { $_.id -eq $ModelAlias } | Select-Object -First 1
+$Routes = Invoke-RestMethod -Uri "$BaseUrl/v1/routes" -Method Get -TimeoutSec 3
+$Route = @($Routes.routes) | Where-Object { $_.public_name -eq $ModelAlias } | Select-Object -First 1
 if (-not $Route) {
     throw 'ModelDeck has not published the scenechat-vision route.'
+}
+if ($Route.protocol_contract -ne 'scene-analysis-v1') {
+    throw 'The scenechat-vision route does not publish the scene-analysis-v1 contract.'
+}
+if ($Route.ready -ne $true) {
+    throw 'Start the SceneChat Worker in ModelDeck and wait for ready.'
 }
 
 $Capabilities = Invoke-RestMethod -Uri "$BaseUrl/v1/capabilities" -Method Get -TimeoutSec 3
@@ -36,12 +42,8 @@ if (-not $RouteCapabilities.image_input -or -not $RouteCapabilities.structured_o
     throw 'The scenechat-vision route lacks image_input or structured_output.'
 }
 
-$Routes = Invoke-RestMethod -Uri "$BaseUrl/v1/routes" -Method Get -TimeoutSec 3
 if ($Routes.cloud_fallback -ne $false) {
     throw 'ModelDeck did not confirm that cloud fallback is disabled.'
 }
-if (-not $Route.ready) {
-    throw 'Start the SceneChat Worker in ModelDeck and wait for ready.'
-}
 
-Write-Host 'ModelDeck scenechat-vision is ready with image_input and structured_output.'
+Write-Host 'ModelDeck scenechat-vision is ready with scene-analysis-v1, image_input and structured_output.'

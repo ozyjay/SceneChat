@@ -53,7 +53,7 @@ The scene panel clearly reports when analysis is ready, actively thinking, displ
 | ModelDeck | Model gateway used by SceneChat | `8600` |
 | ModelDeck | Managed private Workers | ModelDeck-assigned; never configured in SceneChat |
 
-SceneChat binds only to `3700`. It sends model requests only to the dedicated `http://127.0.0.1:8600/v1/vision/analyse` gateway route using the `scenechat-vision` alias and `scene-analysis-v1` contract. Readiness requires `image_input` and `structured_output`. SceneChat never calls ModelDeck management or Worker ports and cannot create, start, stop or replace Workers.
+SceneChat binds only to `3700`. It sends model requests only to the dedicated `http://127.0.0.1:8600/v1/vision/analyse` gateway route using the `scenechat-vision` alias and `scene-analysis-v1` contract. Readiness comes from `GET /v1/routes` (`public_name`, `protocol_contract`, and `ready`) plus the `image_input` and `structured_output` values in `GET /v1/capabilities`. Scene-analysis routes are not required to appear in the OpenAI-compatible `/v1/models` list. SceneChat never calls ModelDeck management or Worker ports and cannot create, start, stop or replace Workers.
 
 The 2026 Open Day profile uses the promoted Qwen3.5 0.8B ROCm Worker from ModelDeck runtime package 0.2.2 with a 140-visual-token budget. ModelDeck owns its model discovery, credentials, lifecycle and private routing. SceneChat has no Worker credential and performs no live model download.
 
@@ -127,7 +127,7 @@ Do not promote a model backend to Open Day use until the hardware checks in [MOD
 ## ModelDeck and SceneChat start-up
 
 1. In the ModelDeck repository, run its port and environment checks, then start it in Open Day mode with its PowerShell scripts.
-2. Open `http://127.0.0.1:3600`, start the promoted Qwen3.5 0.8B, 140vt ROCm Worker from runtime package 0.2.2 assigned to Open2026 revision 35, and wait for **ready**.
+2. Open `http://127.0.0.1:3600`. In ModelDeck's live Routing Profiles view, find the currently published capability whose API model ID is `scenechat-vision` and protocol is `scene-analysis-v1`. Start its configured Worker and wait for **Ready**. Do not assume a historical `Open2026` revision is still active or replace the configured model or budgets.
 3. From this repository, run `pwsh -NoProfile -File scripts/check_modeldeck.ps1`.
 4. Run `pwsh -NoProfile -File scripts/run.ps1`, open `http://127.0.0.1:3700/`, and use **Check provider readiness**.
 5. Start the camera, then apply `live` mode with `modeldeck`. If readiness fails, remain in camera-only mode or explicitly select replay/fallback.

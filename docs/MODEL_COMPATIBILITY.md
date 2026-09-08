@@ -1,6 +1,6 @@
 # Model and hardware compatibility record
 
-Last updated: 24 July 2026. Measurements marked **not run** must be completed on the actual booth system. Earlier direct-runtime and revision-34 evidence is retained only as historical context and does not validate the current SceneChat path through the promoted ModelDeck route.
+Last updated: 9 September 2026. Measurements marked **not run** must be completed on the actual booth system. Earlier direct-runtime and numbered Routing Profile evidence is retained only as historical context and does not establish which ModelDeck revision is currently published.
 
 ## Current production candidate
 
@@ -20,6 +20,8 @@ Last updated: 24 July 2026. Measurements marked **not run** must be completed on
 
 ModelDeck owns local model discovery, the immutable Worker definition, private Worker credential, lifecycle, readiness and routing. SceneChat owns only its loopback gateway URL, public alias, bounded request and strict response validation. It neither knows nor addresses the Worker port.
 
+To find the current published route, open ModelDeck at `http://127.0.0.1:3600` and inspect the live Routing Profiles view for the capability whose API model ID is `scenechat-vision` and protocol is `scene-analysis-v1`. Confirm **Ready**, then run `scripts/check_modeldeck.ps1`. The script uses `/v1/routes` for `public_name`, contract and readiness, and `/v1/capabilities` for `image_input` and `structured_output`; `/v1/models` intentionally excludes native scene-analysis discovery. Record the active profile/revision and Worker fingerprint observed at test time. Do not activate an older revision merely because it appears in the historical evidence below.
+
 ## Inspected host
 
 | Item | Observed |
@@ -37,15 +39,16 @@ Ordinary restricted checks cannot validate the physical camera, GPU devices or M
 
 ## Required current acceptance
 
-Start ModelDeck and the prepared Worker using `OPEN_DAY_RUNBOOK.md`, then run:
+Start ModelDeck and its currently published prepared Worker using `OPEN_DAY_RUNBOOK.md`. Begin with the fixed-image check:
 
 ```powershell
 pwsh -NoProfile -File scripts/check_modeldeck.ps1
 pwsh -NoProfile -File scripts/run.ps1
-pwsh -NoProfile -File benchmarks/run.ps1
 ```
 
-Record one complete immutable fingerprint and the following results:
+Use the committed `replay_assets/demo_booth.png` for one attended end-to-end analysis and confirm the strict response schema. Only after it passes, perform a short attended camera check while monitoring system memory and ModelDeck temperature/thermal state. Do not start unattended camera inference or sustained benchmarking. The benchmark command is reserved for a separately approved extended acceptance run.
+
+The table below is historical evidence from 24 July 2026, not the active configuration. For a new acceptance, record one complete current immutable fingerprint and equivalent results without changing the configured vision model or image/token budgets:
 
 | Result | Value |
 |---|---|

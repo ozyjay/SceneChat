@@ -78,10 +78,19 @@ async def test_modeldeck_provider_uses_only_gateway_api_paths():
 
     def handle(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        if request.url.path == "/v1/models":
+        if request.url.path == "/v1/routes":
             return httpx.Response(
                 200,
-                json={"data": [{"id": "scenechat-vision", "ready": True}]},
+                json={
+                    "routes": [
+                        {
+                            "public_name": "scenechat-vision",
+                            "protocol_contract": "scene-analysis-v1",
+                            "ready": True,
+                        }
+                    ],
+                    "cloud_fallback": False,
+                },
             )
         if request.url.path == "/v1/capabilities":
             return httpx.Response(
@@ -127,7 +136,7 @@ async def test_modeldeck_provider_uses_only_gateway_api_paths():
     assert result.completion_tokens == 125
     assert result.completion_token_limit == 1024
     assert [request.url.path for request in requests] == [
-        "/v1/models",
+        "/v1/routes",
         "/v1/capabilities",
         "/v1/vision/analyse",
     ]
@@ -146,26 +155,52 @@ async def test_modeldeck_provider_uses_only_gateway_api_paths():
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    ("models", "capabilities", "code"),
+    ("routes", "capabilities", "code"),
     [
-        ({"data": []}, {}, "route_not_published"),
+        ({"routes": [], "cloud_fallback": False}, {}, "route_not_published"),
         (
-            {"data": [{"id": "scenechat-vision", "ready": False}]},
+            {
+                "routes": [{
+                    "public_name": "scenechat-vision",
+                    "protocol_contract": "scene-analysis-v1",
+                    "ready": False,
+                }],
+                "cloud_fallback": False,
+            },
             {"scenechat-vision": {"image_input": True, "structured_output": True}},
             "worker_not_ready",
         ),
         (
-            {"data": [{"id": "scenechat-vision", "ready": True}]},
+            {
+                "routes": [{
+                    "public_name": "scenechat-vision",
+                    "protocol_contract": "scene-analysis-v1",
+                    "ready": True,
+                }],
+                "cloud_fallback": False,
+            },
             {"scenechat-vision": {"image_input": True, "structured_output": False}},
             "capability_mismatch",
+        ),
+        (
+            {
+                "routes": [{
+                    "public_name": "scenechat-vision",
+                    "protocol_contract": "openai-image-chat-v1",
+                    "ready": True,
+                }],
+                "cloud_fallback": False,
+            },
+            {"scenechat-vision": {"image_input": True, "structured_output": True}},
+            "contract_mismatch",
         ),
     ],
 )
 async def test_modeldeck_health_requires_published_ready_capable_route(
-    models, capabilities, code
+    routes, capabilities, code
 ):
     def handle(request: httpx.Request) -> httpx.Response:
-        payload = models if request.url.path == "/v1/models" else capabilities
+        payload = routes if request.url.path == "/v1/routes" else capabilities
         return httpx.Response(200, json=payload)
 
     provider = ModelDeckProvider(
@@ -181,6 +216,92 @@ async def test_modeldeck_health_requires_published_ready_capable_route(
 
     assert status.available is False
     assert status.code == code
+
+
+@pytest.mark.anyio
+async def test_modeldeck_health_requires_disabled_cloud_fallback():
+    provider = ModelDeckProvider(
+        "http://127.0.0.1:8600",
+        "scenechat-vision",
+        2,
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={"routes": [], "cloud_fallback": True},
+            )
+        ),
+    )
+    try:
+        status = await provider.health()
+    finally:
+        await provider.close()
+
+    assert status.available is False
+    assert status.code == "cloud_fallback_not_disabled"
+
+
+@pytest.mark.anyio
+async def test_modeldeck_health_reports_gateway_failure():
+    def unavailable(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("gateway unavailable", request=request)
+
+    provider = ModelDeckProvider(
+        "http://127.0.0.1:8600",
+        "scenechat-vision",
+        2,
+        transport=httpx.MockTransport(unavailable),
+    )
+    try:
+        status = await provider.health()
+    finally:
+        await provider.close()
+
+    assert status.available is False
+    assert status.code == "gateway_unavailable"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "path,payload",
+    [
+        ("/v1/routes", {"routes": "not-a-list"}),
+        ("/v1/routes", {"routes": ["not-an-object"]}),
+        ("/v1/capabilities", ["not-an-object"]),
+    ],
+)
+async def test_modeldeck_health_rejects_malformed_discovery(path, payload):
+    valid_routes = {
+        "routes": [{
+            "public_name": "scenechat-vision",
+            "protocol_contract": "scene-analysis-v1",
+            "ready": True,
+        }],
+        "cloud_fallback": False,
+    }
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == path:
+            return httpx.Response(200, json=payload)
+        if request.url.path == "/v1/routes":
+            return httpx.Response(200, json=valid_routes)
+        return httpx.Response(
+            200,
+            json={"scenechat-vision": {"image_input": True, "structured_output": True}},
+        )
+
+    provider = ModelDeckProvider(
+        "http://127.0.0.1:8600",
+        "scenechat-vision",
+        2,
+        transport=httpx.MockTransport(handle),
+    )
+    try:
+        status = await provider.health()
+    finally:
+        await provider.close()
+
+    assert status.available is False
+    assert status.code == "invalid_health_response"
 
 
 @pytest.mark.anyio
