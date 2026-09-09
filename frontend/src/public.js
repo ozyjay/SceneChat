@@ -444,8 +444,28 @@ function render(next) {
 }
 
 async function analyse(question) {
+  const started = performance.now();
+  const generation = state.current?.generation;
   try {
-    await request('/api/analyse', {method: 'POST', body: JSON.stringify({question})});
+    const result = await request('/api/analyse', {method: 'POST', body: JSON.stringify({question})});
+    if (result.applied && result.analysis?.analysis_request_id) {
+      const requestId = result.analysis.analysis_request_id;
+      const current = await request("/api/state");
+      if (current.generation === generation && !current.privacy_screen
+          && state.current?.generation === generation && !state.current?.privacy_screen
+          && current.revision >= state.current.revision
+          && current.scene_analysis?.analysis_request_id === requestId) {
+        render(current);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (state.current?.generation !== generation || state.current?.privacy_screen
+              || state.current?.scene_analysis?.analysis_request_id !== requestId) return;
+          window.dispatchEvent(new CustomEvent("scenechat-analysis-displayed", {detail: {
+            request_id: requestId, duration_ms: performance.now() - started,
+            measurement: "manual-request-to-painted-display",
+          }}));
+        }));
+      }
+    }
   } catch (error) { showToast(error.message); }
 }
 

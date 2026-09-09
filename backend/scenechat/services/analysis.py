@@ -1,6 +1,8 @@
 """Scene-analysis orchestration, timeout isolation, and stale-result rejection."""
 
 import asyncio
+import time
+import uuid
 
 from scenechat.detection.prompt_learning import sanitise_scene_analysis
 from scenechat.services.state import StateStore
@@ -33,6 +35,8 @@ class AnalysisService:
             raise ValueError("Only curated questions are accepted")
         if self._lock.locked():
             raise AnalysisBusy("A scene analysis is already running")
+        started = time.perf_counter()
+        request_id = str(uuid.uuid4())
         async with self._lock:
             snapshot = await self.state.snapshot()
             generation = snapshot.generation
@@ -50,8 +54,19 @@ class AnalysisService:
                     provider.analyse_scene(image, question), timeout=self.timeout
                 )
                 analysis = sanitise_scene_analysis(analysis)
+                analysis.analysis_request_id = request_id
+                analysis.application_elapsed_ms = (time.perf_counter() - started) * 1000
                 applied = await self.state.set_analysis(analysis, generation)
                 return analysis, applied
+            except asyncio.CancelledError:
+                def cancelled(state):
+                    if state.generation == generation and state.provider == provider_name:
+                        state.analysis_in_progress = False
+                        state.provider_status_code = "cancelled"
+                        state.provider_status_message = "The scene analysis was cancelled."
+
+                await self.state.mutate(cancelled)
+                raise
             except Exception as exc:
                 message = "Scene analysis is temporarily unavailable."
 

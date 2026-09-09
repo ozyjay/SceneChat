@@ -97,6 +97,8 @@ class SceneAnalysisPayload(BaseModel):
 
 
 class SceneAnalysis(SceneAnalysisPayload):
+    analysis_request_id: str | None = None
+    application_elapsed_ms: float | None = Field(default=None, ge=0)
     generated_at: datetime = Field(default_factory=utc_now)
     provider: str = Field(default="unknown", max_length=40)
     latency_ms: float | None = Field(default=None, ge=0)
